@@ -19,9 +19,11 @@ export const useInvoicesFixed = (companyId?: string) => {
         console.log('[useInvoicesFixed] Starting fetch for companyId:', companyId);
 
         // Fetch invoices using the external API adapter
+        // invoice_type_id=1 for actual invoices (excludes quotations where type_id=2)
         console.log('[useInvoicesFixed] Calling apiClient.select("invoices", {company_id:', companyId, '})');
         const { data: invoices, error: invoicesError } = await apiClient.select('invoices', {
-          company_id: companyId
+          company_id: companyId,
+          invoice_type_id: 1
         });
 
         console.log('[useInvoicesFixed] API response - Error:', invoicesError);
@@ -150,6 +152,7 @@ export const useCustomerInvoicesFixed = (customerId?: string, companyId?: string
         // Fetch invoices for the customer using the external API adapter
         const { data: invoices, error: invoicesError } = await apiClient.select('invoices', {
           customer_id: customerId,
+          invoice_type_id: 1,
           ...(companyId && { company_id: companyId })
         });
 

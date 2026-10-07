@@ -66,9 +66,11 @@ export function Layout({ children }: LayoutProps) {
   const showDebugPanel = params.has('debug') || localStorage.getItem('debug_permissions') === 'true';
 
   // Show full authenticated layout with sidebar only for authenticated users
+  const showInventoryPermissionFix =
+    location.pathname.startsWith('/app/inventory');
   return (
     <>
-      <AdminInventoryPermissionFix />
+      {showInventoryPermissionFix && <AdminInventoryPermissionFix />}
       <div className="flex h-screen bg-background">
         <Sidebar isOpen={isMobileMenuOpen} onClose={closeMobileMenu} />
         <div className="flex flex-1 flex-col overflow-hidden min-w-0">

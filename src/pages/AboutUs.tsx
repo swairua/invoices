@@ -38,7 +38,7 @@ export default function AboutUs() {
       <BreadcrumbNav items={[{ label: 'About Us', href: '/about-us' }]} />
 
       {/* Page Hero */}
-      <section className="bg-gradient-to-r from-blue-600 to-green-600 text-white py-12 sm:py-16">
+      <section className="bg-gradient-to-r from-maroon to-neutral-700 text-white py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4">About {companyConfig.name}</h1>
           <p className="text-base sm:text-lg md:text-xl text-white/90">Learn about our journey, mission, and commitment to healthcare excellence</p>
@@ -168,7 +168,7 @@ export default function AboutUs() {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-gradient-to-r from-blue-600 to-green-600 text-white py-16">
+      <section className="bg-gradient-to-r from-maroon to-neutral-700 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Partner With Us?</h2>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

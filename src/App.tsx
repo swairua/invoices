@@ -9,6 +9,8 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { routePermissionMap } from "@/constants/routePermissions";
 import Index from "./pages/Index";
+import PublicSite from "./pages/public/PublicSite";
+import PublicProducts from "./pages/public/PublicProducts";
 import Quotations from "./pages/Quotations";
 import Invoices from "./pages/Invoices";
 import DirectReceipts from "./pages/DirectReceipts";
@@ -84,6 +86,10 @@ const App = () => {
         {/* Login route - Accessible without authentication */}
         <Route path="/login" element={<Login />} />
 
+        {/* Public website routes - no auth, no app Layout */}
+        <Route path="/" element={<PublicSite />} />
+        <Route path="/products" element={<PublicProducts />} />
+
         {/* All other routes wrapped in Layout */}
         <Route
           path="*"
@@ -91,7 +97,7 @@ const App = () => {
             <CompanyProvider>
               <Layout>
               <Routes>
-                {/* Redirect root to app dashboard */}
+                {/* Redirect sub-path root to app dashboard */}
                 <Route path="/" element={<Navigate to="/app" replace />} />
 
                 {/* App Routes - Protected */}

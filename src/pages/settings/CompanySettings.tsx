@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useUpdateCompany, useCreateCompany, useTaxSettings, useCreateTaxSetting, useUpdateTaxSetting, useDeleteTaxSetting } from '@/hooks/useDatabase';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyConfig } from '@/hooks/useCompanyConfig';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
 import { ForceTaxSettings } from '@/components/ForceTaxSettings';
@@ -90,6 +91,7 @@ export default function CompanySettings() {
   });
 
   const { currentCompany, isLoading: companiesLoading, error: companiesError } = useCurrentCompany();
+  const companyConfig = useCompanyConfig();
   const { data: taxSettings, isLoading: taxSettingsLoading, error: taxSettingsError } = useTaxSettings(currentCompany?.id);
   const updateCompany = useUpdateCompany();
   const createCompany = useCreateCompany();
@@ -134,41 +136,33 @@ export default function CompanySettings() {
   }, [companiesLoading, companiesError, currentCompany, taxSettings, taxSettingsLoading, taxSettingsError]);
 
   useEffect(() => {
-    if (currentCompany) {
-      setCompanyData({
-        name: currentCompany.name || '',
-        registration_number: currentCompany.registration_number || '',
-        tax_number: currentCompany.tax_number || '',
-        email: currentCompany.email || '',
-        phone: currentCompany.phone || '',
-        address: currentCompany.address || '',
-        city: currentCompany.city || '',
-        state: currentCompany.state || '',
-        postal_code: currentCompany.postal_code || '',
-        country: currentCompany.country || '',
-        currency: currentCompany.currency || '',
-        fiscal_year_start: currentCompany.fiscal_year_start || 1,
-        logo_url: currentCompany.logo_url || '',
-        primary_color: currentCompany.primary_color || '#6B7280',
-        pdf_template: currentCompany.pdf_template || 'default',
-        website: currentCompany.website || '',
-        pdf_footer_line1: currentCompany.pdf_footer_line1 || '',
-        pdf_footer_line2: currentCompany.pdf_footer_line2 || '',
-        pdf_footer_enabled_docs: Array.isArray(currentCompany.pdf_footer_enabled_docs)
-          ? currentCompany.pdf_footer_enabled_docs
-          : typeof currentCompany.pdf_footer_enabled_docs === 'string' && currentCompany.pdf_footer_enabled_docs.trim()
-            ? (() => {
-                try {
-                  return JSON.parse(currentCompany.pdf_footer_enabled_docs);
-                } catch (e) {
-                  console.error('Failed to parse pdf_footer_enabled_docs:', e);
-                  return [];
-                }
-              })()
-            : []
-      });
-    }
-  }, [currentCompany]);
+    // Prefer the clean local company config (Haemonetics branding + admin
+    // overrides); the raw `accounts` row has dirty prefixed values
+    // (e.g. "Email: sales@heal.co.ke", "WEBSITE: https://...") that break
+    // form validation and make the Save button appear to do nothing.
+    // Fall back to the real account row for fields not covered by the config,
+    // preserving any user edits made to non-branding fields (pdf footer etc.).
+    setCompanyData(prev => ({
+      ...prev,
+      name: companyConfig.name || currentCompany?.name || 'Haemonetics East Africa Limited',
+      email: companyConfig.email || currentCompany?.email || '',
+      phone: companyConfig.phone || currentCompany?.phone || '+254 207 863 782',
+      address: companyConfig.address || currentCompany?.address || 'Naivasha Road, Kamrose Plaza, 1st Flr, Rm 14',
+      city: companyConfig.city || currentCompany?.city || 'Nairobi',
+      country: companyConfig.country || currentCompany?.country || 'Kenya',
+      currency: companyConfig.currency || currentCompany?.currency || 'KES',
+      logo_url: companyConfig.logo_url || currentCompany?.logo_url || '',
+      primary_color: companyConfig.primary_color || currentCompany?.primary_color || '#0d9488',
+      website: companyConfig.website || currentCompany?.website || '',
+      registration_number: currentCompany?.registration_number || prev.registration_number,
+      tax_number: currentCompany?.tax_number || prev.tax_number,
+      fiscal_year_start: currentCompany?.fiscal_year_start || prev.fiscal_year_start,
+      pdf_template: currentCompany?.pdf_template || prev.pdf_template,
+      pdf_footer_line1: currentCompany?.pdf_footer_line1 || prev.pdf_footer_line1,
+      pdf_footer_line2: currentCompany?.pdf_footer_line2 || prev.pdf_footer_line2,
+      pdf_footer_enabled_docs: currentCompany?.pdf_footer_enabled_docs ?? prev.pdf_footer_enabled_docs,
+    }));
+  }, [currentCompany?.id, companyConfig]);
 
   const handleOpenPreview = (templateIndex: number) => {
     setPreviewTemplateIndex(templateIndex);

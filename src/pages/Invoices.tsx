@@ -56,6 +56,16 @@ import { downloadInvoicePDF } from '@/utils/pdfGenerator';
 import { reconcileAllInvoiceBalances } from '@/utils/balanceReconciliation';
 import { getDatabase } from '@/integrations/database';
 
+// Null/Invalid-safe date formatter - prevents epoch (1970-01-01) display when
+// the underlying due_date is NULL (common in the raw Invoice Ninja schema), since
+// `new Date(null)` resolves to the Unix epoch.
+function safeDate(dateString?: string | null): string {
+  if (!dateString) return '—';
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString();
+}
+
 interface Invoice {
   id: string;
   invoice_number: string;
@@ -352,11 +362,11 @@ export default function Invoices() {
       const subject = `Invoice ${invoiceData.invoice_number} from ${companyName}`;
       const body = `Dear ${invoiceData.customers.name},
 
-Please find attached your invoice ${invoiceData.invoice_number} dated ${new Date(invoiceData.invoice_date).toLocaleDateString()}.
+Please find attached your invoice ${invoiceData.invoice_number} dated ${safeDate(invoiceData.invoice_date)}.
 
 Invoice Summary:
 - Invoice Amount: ${formatCurrency(invoiceData.total_amount || 0)}
-- Due Date: ${new Date(invoiceData.due_date).toLocaleDateString()}
+- Due Date: ${safeDate(invoiceData.due_date)}
 - Balance Due: ${formatCurrency(invoiceData.balance_due || 0)}
 
 Payment can be made via:
@@ -687,15 +697,15 @@ Email: ${currentCompany?.email || 'info@medplusafrica.com'}`;
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                      <TableCell>
                       <div className="flex items-center space-x-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>{new Date(invoice.invoice_date).toLocaleDateString()}</span>
+                        <span>{safeDate(invoice.invoice_date)}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(invoice.due_date).toLocaleDateString()}
-                    </TableCell>
+                      </TableCell>
+                      <TableCell>
+                        {safeDate(invoice.due_date)}
+                      </TableCell>
                     <TableCell className="font-semibold">
                       {formatCurrency(invoice.total_amount || 0)}
                     </TableCell>

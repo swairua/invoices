@@ -266,7 +266,7 @@ export default function ProductDetail() {
                           setSelectedVariantForImages(v);
                           setShowImagesModal(true);
                         }}
-                        className="absolute bottom-2 right-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer hover:shadow-lg hover:scale-110 border-2 border-white shadow-md flex items-center gap-1"
+                        className="absolute bottom-2 right-2 bg-maroon hover:bg-maroon/dark text-white px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer hover:shadow-lg hover:scale-110 border-2 border-white shadow-md flex items-center gap-1"
                         title="Click to view all images"
                       >
                         <span>+{categoryVariantImages[v.id].length - 1}</span>
@@ -299,7 +299,7 @@ export default function ProductDetail() {
                           phone: ''
                         });
                       }}
-                      className="w-full bg-gradient-to-r from-blue-500 to-green-500 text-white font-bold py-2 px-4 rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105 text-sm flex items-center justify-center gap-2"
+                      className="w-full bg-gradient-to-r from-maroon to-neutral-700 text-white font-bold py-2 px-4 rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105 text-sm flex items-center justify-center gap-2"
                     >
                       <MessageCircle size={16} />
                       Request Quotation
@@ -524,7 +524,7 @@ export default function ProductDetail() {
               <Button
                 type="button"
                 onClick={sendToWhatsApp}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2"
+                className="flex-1 bg-maroon hover:bg-maroon/dark text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2"
               >
                 <MessageCircle size={20} />
                 Send via WhatsApp

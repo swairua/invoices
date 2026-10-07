@@ -310,6 +310,11 @@ Email: ${companyEmail}`;
     }
   };
 
+  const handleConvertSuccess = () => {
+    refetch();
+    setSelectedQuotation(null);
+  };
+
   const handleConvertToInvoice = async (quotation: Quotation) => {
     try {
       setIsLoadingConversionData(true);
@@ -350,11 +355,6 @@ Email: ${companyEmail}`;
     } finally {
       setIsLoadingConversionData(false);
     }
-  };
-
-  const handleConvertSuccess = () => {
-    refetch();
-    setSelectedQuotation(null);
   };
 
   const handleConversionPreviewConfirm = async (modifiedData?: any) => {
@@ -640,26 +640,26 @@ Email: ${companyEmail}`;
                           )}
                           {quotation.status !== 'converted' && (
                             <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleConvertToProforma(quotation)}
-                                className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-600 hover:text-white"
-                                title="Convert to Proforma Invoice"
-                              >
-                                <FileText className="h-4 w-4 mr-1" />
-                                <span className="hidden sm:inline">Proforma</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleConvertToInvoice(quotation)}
-                                className="bg-success-light text-success border-success/20 hover:bg-success hover:text-success-foreground"
-                                title="Convert directly to Invoice"
-                              >
-                                <Receipt className="h-4 w-4 mr-1" />
-                                <span className="hidden sm:inline">Invoice</span>
-                              </Button>
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 onClick={() => handleConvertToProforma(quotation)}
+                                 className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-600 hover:text-white"
+                                 title="Convert to Proforma Invoice"
+                               >
+                                 <FileText className="h-4 w-4 mr-1" />
+                                 <span className="hidden sm:inline">Proforma</span>
+                               </Button>
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 onClick={() => handleConvertToInvoice(quotation)}
+                                 className="bg-success-light text-success border-success/20 hover:bg-success hover:text-success-foreground"
+                                 title="Convert directly to Invoice"
+                               >
+                                 <Receipt className="h-4 w-4 mr-1" />
+                                 <span className="hidden sm:inline">Invoice</span>
+                               </Button>
                             </>
                           )}
                         </div>

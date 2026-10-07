@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -86,7 +86,7 @@ export function CreateCreditNoteModal({
   preSelectedInvoice 
 }: CreateCreditNoteModalProps) {
   const [selectedCustomerId, setSelectedCustomerId] = useState(preSelectedCustomer?.id || '');
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState(preSelectedInvoice?.id || 'none');
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState(preSelectedInvoice?.id || '');
   const [creditNoteDate, setCreditNoteDate] = useState(new Date().toISOString().split('T')[0]);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
@@ -94,8 +94,10 @@ export function CreateCreditNoteModal({
   const [affectsInventory, setAffectsInventory] = useState(false);
   
   const [items, setItems] = useState<CreditNoteItem[]>([]);
+  const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
   const [searchProduct, setSearchProduct] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const populatedInvoiceRef = useRef<string | null>(null);
 
   const { currentCompany } = useCurrentCompany();
   const companyId = currentCompany?.id;
@@ -128,6 +130,41 @@ export function CreateCreditNoteModal({
     }
   }, [preSelectedCustomer, preSelectedInvoice, open]);
 
+  // Pre-populate items with checkboxes from selected invoice
+  useEffect(() => {
+    if (!selectedInvoiceId || selectedInvoiceId === '') {
+      setItems([]);
+      setCheckedState({});
+      populatedInvoiceRef.current = null;
+      return;
+    }
+    if (populatedInvoiceRef.current === selectedInvoiceId) return;
+    if (!invoices) return;
+
+    const invoice = invoices.find(inv => inv.id === selectedInvoiceId);
+    if (!invoice) return;
+
+    const invoiceItems = invoice.invoice_items || [];
+    const mappedItems: CreditNoteItem[] = invoiceItems.map((item: any) => ({
+      id: `inv-${item.id}`,
+      product_id: item.product_id || undefined,
+      product_name: products?.find(p => p.id === item.product_id)?.name || item.description || 'Item',
+      description: item.description || '',
+      quantity: Number(item.quantity) || 1,
+      unit_price: Number(item.unit_price) || 0,
+      tax_percentage: Number(item.tax_percentage) || 0,
+      tax_amount: Number(item.tax_amount) || 0,
+      tax_inclusive: item.tax_inclusive === true || item.tax_inclusive === 1 || item.tax_inclusive === '1',
+      line_total: Number(item.line_total) || 0
+    }));
+
+    setItems(mappedItems);
+    const initialChecked: Record<string, boolean> = {};
+    mappedItems.forEach(item => { initialChecked[item.id] = true; });
+    setCheckedState(initialChecked);
+    populatedInvoiceRef.current = selectedInvoiceId;
+  }, [selectedInvoiceId, invoices, products]);
+
   const filteredProducts = products?.filter(product =>
     product.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
     product.product_code.toLowerCase().includes(searchProduct.toLowerCase())
@@ -159,6 +196,7 @@ export function CreateCreditNoteModal({
     newItem.tax_amount = taxAmount;
 
     setItems([...items, newItem]);
+    setCheckedState(prev => ({ ...prev, [newItem.id]: true }));
     setSearchProduct('');
   };
 
@@ -177,6 +215,7 @@ export function CreateCreditNoteModal({
     };
 
     setItems([...items, newItem]);
+    setCheckedState(prev => ({ ...prev, [newItem.id]: true }));
   };
 
   const calculateLineTotal = (item: CreditNoteItem, quantity?: number, unitPrice?: number, taxPercentage?: number, taxInclusive?: boolean) => {
@@ -261,6 +300,21 @@ export function CreateCreditNoteModal({
 
   const removeItem = (itemId: string) => {
     setItems(items.filter(item => item.id !== itemId));
+    setCheckedState(prev => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+  };
+
+  const toggleItemChecked = (itemId: string, checked: boolean) => {
+    setCheckedState(prev => ({ ...prev, [itemId]: checked }));
+  };
+
+  const toggleAllChecked = (checked: boolean) => {
+    const next: Record<string, boolean> = {};
+    items.forEach(item => { next[item.id] = checked; });
+    setCheckedState(next);
   };
 
   const formatCurrency = (amount: number) => {
@@ -272,9 +326,10 @@ export function CreateCreditNoteModal({
     }).format(amount);
   };
 
-  const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-  const taxAmount = items.reduce((sum, item) => sum + (item.tax_amount || 0), 0);
-  const totalAmount = items.reduce((sum, item) => sum + item.line_total, 0);
+  const checkedItems = items.filter(item => checkedState[item.id]);
+  const subtotal = checkedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  const taxAmount = checkedItems.reduce((sum, item) => sum + (item.tax_amount || 0), 0);
+  const totalAmount = checkedItems.reduce((sum, item) => sum + item.line_total, 0);
 
   const handleSubmit = async () => {
     // Enhanced validation
@@ -288,8 +343,13 @@ export function CreateCreditNoteModal({
       return;
     }
 
-    if (items.length === 0) {
-      toast.error('Please add at least one item');
+    if (!selectedInvoiceId) {
+      toast.error('Please select an invoice to create the credit note against');
+      return;
+    }
+
+    if (checkedItems.length === 0) {
+      toast.error('Please check at least one item to credit');
       return;
     }
 
@@ -299,7 +359,7 @@ export function CreateCreditNoteModal({
     }
 
     // Validate items
-    const invalidItems = items.filter(item =>
+    const invalidItems = checkedItems.filter(item =>
       !item.description.trim() ||
       item.quantity <= 0 ||
       item.unit_price < 0
@@ -325,7 +385,7 @@ export function CreateCreditNoteModal({
       const creditNoteData = {
         company_id: companyId,
         customer_id: selectedCustomerId,
-        invoice_id: selectedInvoiceId && selectedInvoiceId !== 'none' ? selectedInvoiceId : null,
+        invoice_id: selectedInvoiceId,
         credit_note_number: creditNoteNumber,
         credit_note_date: creditNoteDate,
         status: 'draft' as const,
@@ -341,7 +401,7 @@ export function CreateCreditNoteModal({
         created_by: null // TODO: Get from auth context when implemented
       };
 
-      const creditNoteItems = items.map((item, index) => ({
+      const creditNoteItems = checkedItems.map((item, index) => ({
         product_id: item.product_id || null,
         description: item.description,
         quantity: item.quantity,
@@ -373,13 +433,15 @@ export function CreateCreditNoteModal({
 
   const resetForm = () => {
     setSelectedCustomerId('');
-    setSelectedInvoiceId('none');
+    setSelectedInvoiceId('');
     setCreditNoteDate(new Date().toISOString().split('T')[0]);
     setReason('');
     setNotes('');
     setTermsAndConditions('All credits must be used within 90 days.');
     setAffectsInventory(false);
     setItems([]);
+    setCheckedState({});
+    populatedInvoiceRef.current = null;
     setSearchProduct('');
   };
 
@@ -425,21 +487,26 @@ export function CreateCreditNoteModal({
                   </Select>
                 </div>
 
-                {/* Invoice Selection (Optional) */}
-                {selectedCustomerId && customerInvoices.length > 0 && (
+                {/* Invoice Selection (Required) */}
+                {selectedCustomerId && (
                   <div className="space-y-2">
-                    <Label htmlFor="invoice">Related Invoice (Optional)</Label>
-                    <Select value={selectedInvoiceId || 'none'} onValueChange={setSelectedInvoiceId}>
+                    <Label htmlFor="invoice">Related Invoice *</Label>
+                    <Select value={selectedInvoiceId || ''} onValueChange={setSelectedInvoiceId}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select an invoice (optional)" />
+                        <SelectValue placeholder="Select an invoice" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">No specific invoice</SelectItem>
-                        {customerInvoices.filter(inv => inv?.id).map((invoice) => (
-                          <SelectItem key={invoice.id} value={invoice.id}>
-                            {invoice.invoice_number} | {formatCurrency(invoice.total_amount || 0)} | Balance: {formatCurrency(invoice.balance_due || 0)}
-                          </SelectItem>
-                        ))}
+                        {loadingCustomers ? (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading...</div>
+                        ) : customerInvoices.length === 0 ? (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">No invoices found for this customer</div>
+                        ) : (
+                          customerInvoices.filter(inv => inv?.id).map((invoice) => (
+                            <SelectItem key={invoice.id} value={invoice.id}>
+                              {invoice.invoice_number} | {formatCurrency(invoice.total_amount || 0)} | Balance: {formatCurrency(invoice.balance_due || 0)}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -587,18 +654,24 @@ export function CreateCreditNoteModal({
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Credit Note Items</span>
-              <Badge variant="outline">{items.length} items</Badge>
+              <Badge variant="outline">{checkedItems.length}/{items.length} selected</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
             {items.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No items added yet. Search and select products to add them.
+                Select an invoice to load its items, or search and select products to add them.
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={items.length > 0 && items.every(item => checkedState[item.id])}
+                        onCheckedChange={(checked) => toggleAllChecked(!!checked)}
+                      />
+                    </TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead>Qty</TableHead>
                     <TableHead>Unit Price</TableHead>
@@ -610,7 +683,13 @@ export function CreateCreditNoteModal({
                 </TableHeader>
                 <TableBody>
                   {items.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} className={checkedState[item.id] ? '' : 'opacity-50'}>
+                      <TableCell>
+                        <Checkbox
+                          checked={!!checkedState[item.id]}
+                          onCheckedChange={(checked) => toggleItemChecked(item.id, !!checked)}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div>
                           {item.product_id ? (
@@ -726,7 +805,7 @@ export function CreateCreditNoteModal({
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={isSubmitting || !selectedCustomerId || items.length === 0 || !reason.trim()}
+            disabled={isSubmitting || !selectedCustomerId || !selectedInvoiceId || checkedItems.length === 0 || !reason.trim()}
           >
             <Calculator className="h-4 w-4 mr-2" />
             {isSubmitting ? 'Creating...' : 'Create Credit Note'}

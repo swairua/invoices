@@ -103,12 +103,12 @@ export default function Customers() {
 
   // Filter and search logic
   const filteredCustomers = (customers?.filter(customer => {
-    // Search filter
+    // Search filter (guard against NULL name/code in the raw clients table)
     const matchesSearch =
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.customer_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone?.toLowerCase().includes(searchTerm.toLowerCase());
+      (customer.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.customer_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.phone || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     // Status filter
     const matchesStatus = statusFilter === 'all' ||
@@ -451,7 +451,7 @@ export default function Customers() {
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-10 w-10">
                           <AvatarFallback className="bg-primary text-primary-foreground font-medium">
-                            {customer.name.charAt(0).toUpperCase()}
+                            {(customer.name || customer.email || '?').charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div>

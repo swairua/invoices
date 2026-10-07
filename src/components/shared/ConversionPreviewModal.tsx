@@ -303,14 +303,14 @@ export function ConversionPreviewModal({
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Auto-generated info */}
-                <div className="bg-muted/50 p-3 rounded text-sm space-y-1">
-                  <p className="font-medium text-foreground">Will be auto-generated:</p>
-                  <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
-                    <li>Document number (e.g., {destinationData.documentType === 'invoice' ? 'INV-' : 'PROFORMA-'}...)</li>
-                    <li>Created date: Today</li>
-                    {destinationData.dueDate && <li>Due date: {formatDate(destinationData.dueDate)}</li>}
-                  </ul>
-                </div>
+                  <div className="bg-muted/50 p-3 rounded text-sm space-y-1">
+                    <p className="font-medium text-foreground">Will be auto-generated:</p>
+                    <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+                      <li>Document number (e.g., {destinationData.documentType === 'invoice' ? 'INV-' : 'PROFORMA-'}...)</li>
+                      <li>Created date: Today</li>
+                      {destinationData.dueDate && <li>Due date: {formatDate(destinationData.dueDate)}</li>}
+                    </ul>
+                  </div>
 
                 {/* Document Details */}
                 <div className="space-y-2">

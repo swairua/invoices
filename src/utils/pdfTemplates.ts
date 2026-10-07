@@ -57,7 +57,7 @@ const defaultTemplate: PDFTemplate = {
     return `
       <!-- Header Section -->
       <div class="header">
-        <!-- Row 1: Logo (20%) + Company Details (80%) -->
+        <!-- Row 1: Logo (left margin) + Company Details (right aligned, same row) -->
         <div class="header-row-1">
           <div class="logo">
             ${company.logo_url ?
@@ -173,6 +173,7 @@ const defaultTemplate: PDFTemplate = {
         font-weight: bold;
         margin-bottom: 8px;
         color: ${primaryColor};
+        text-align: right;
       }
       
       .company-details {
@@ -180,6 +181,7 @@ const defaultTemplate: PDFTemplate = {
         line-height: 1.6;
         color: #666;
         margin-bottom: 0;
+        text-align: right;
       }
       
       .document-info {
@@ -419,6 +421,7 @@ const helixTemplate: PDFTemplate = {
         margin-bottom: 4px;
         color: #1a1a1a;
         letter-spacing: 0.5px;
+        text-align: right;
       }
 
       .company-tagline {
@@ -426,12 +429,14 @@ const helixTemplate: PDFTemplate = {
         color: ${primaryColor};
         margin-bottom: 6px;
         font-weight: 500;
+        text-align: right;
       }
       
       .company-details {
         font-size: 10px;
         color: #666;
         line-height: 1.4;
+        text-align: right;
       }
       
       .document-info {
@@ -700,6 +705,7 @@ const helixGeneralHardwareTemplate: PDFTemplate = {
         margin-bottom: 2px;
         color: ${primaryColor};
         letter-spacing: 1px;
+        text-align: right;
       }
 
       .company-subtitle {
@@ -707,6 +713,7 @@ const helixGeneralHardwareTemplate: PDFTemplate = {
         color: ${primaryColor};
         margin-bottom: 4px;
         font-weight: 500;
+        text-align: right;
       }
 
       .company-contact {
@@ -714,6 +721,7 @@ const helixGeneralHardwareTemplate: PDFTemplate = {
         color: #333;
         margin-bottom: 4px;
         line-height: 1.3;
+        text-align: right;
       }
 
       .company-tagline {
@@ -721,6 +729,7 @@ const helixGeneralHardwareTemplate: PDFTemplate = {
         color: #666;
         font-style: italic;
         margin-top: 2px;
+        text-align: right;
       }
 
       .document-info {
@@ -834,7 +843,7 @@ export function renderHeaderHTML(
   company: CompanyDataForTemplate,
   data: TemplateData,
   templateName: TemplateName | string = 'default',
-  primaryColor: string = '#FF8C42'
+  primaryColor: string = '#800000'
 ): string {
   const template = getTemplate(templateName);
   return template.renderHeader(company, data, primaryColor);
@@ -843,7 +852,7 @@ export function renderHeaderHTML(
 /**
  * Get CSS for a specific template
  */
-export function getTemplateCSS(templateName: TemplateName | string = 'default', primaryColor: string = '#FF8C42'): string {
+export function getTemplateCSS(templateName: TemplateName | string = 'default', primaryColor: string = '#800000'): string {
   const template = getTemplate(templateName);
   return template.getCSS(primaryColor);
 }

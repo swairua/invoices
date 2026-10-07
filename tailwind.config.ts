@@ -35,6 +35,26 @@ export default {
 					foreground: 'hsl(var(--secondary-foreground))',
 					hover: 'hsl(var(--secondary-hover))'
 				},
+				// Maroon brand color palette (#800000)
+				maroon: {
+					DEFAULT: '#800000',
+					light: '#990000',
+					dark: '#660000',
+					foreground: '#ffffff',
+				},
+				// Grey/neutral palette
+				neutral: {
+					50: '#f8f9fa',
+					100: '#f1f3f5',
+					200: '#e9ecef',
+					300: '#dee2e6',
+					400: '#ced4da',
+					500: '#adb5bd',
+					600: '#6c757d',
+					700: '#495057',
+					800: '#343a40',
+					900: '#212529',
+				},
 				success: {
 					DEFAULT: 'hsl(var(--success))',
 					foreground: 'hsl(var(--success-foreground))',

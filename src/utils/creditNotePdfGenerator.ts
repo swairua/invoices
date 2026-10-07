@@ -121,10 +121,10 @@ export const generateCreditNotePDF = (creditNote: CreditNotePDFData, company?: C
         }
         
         .header-row-1 {
-          display: grid;
-          grid-template-columns: 1fr 2fr;
-          gap: 20px;
+          display: flex;
+          justify-content: space-between;
           align-items: flex-start;
+          gap: 20px;
           padding-bottom: 20px;
           border-bottom: 2px solid ${primaryColor};
         }
@@ -144,10 +144,8 @@ export const generateCreditNotePDF = (creditNote: CreditNotePDFData, company?: C
           height: 240px;
           border-radius: 8px;
           overflow: hidden;
-          grid-column: 1;
-          grid-row: 1;
-          justify-self: start;
-          align-self: start;
+          flex-shrink: 0;
+          align-self: flex-start;
         }
         
         .logo img {
@@ -157,8 +155,9 @@ export const generateCreditNotePDF = (creditNote: CreditNotePDFData, company?: C
         }
         
         .company-details-block {
-          grid-column: 2;
-          grid-row: 1;
+          width: 60%;
+          flex-shrink: 0;
+          text-align: right;
         }
         
         .company-name {
@@ -166,6 +165,7 @@ export const generateCreditNotePDF = (creditNote: CreditNotePDFData, company?: C
           font-weight: bold;
           margin-bottom: 8px;
           color: ${primaryColor};
+          text-align: right;
         }
         
         .company-details {
@@ -173,6 +173,7 @@ export const generateCreditNotePDF = (creditNote: CreditNotePDFData, company?: C
           line-height: 1.6;
           color: #666;
           margin-bottom: 0;
+          text-align: right;
         }
         
         .document-info {

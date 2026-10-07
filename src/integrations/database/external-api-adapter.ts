@@ -15,6 +15,7 @@ import type {
 import { getAPIBaseURL } from '../../utils/environment-detection';
 import { handleAuthFailure } from '../../utils/authFailureHandler';
 import { logTokenDiagnostics } from '../../utils/tokenDiagnostics';
+import { mapReadTable, mapReadFilter, mapRow, mapWriteTable, mapWriteData } from './schema-map';
 
 export class ExternalAPIAdapter implements IDatabase {
   private apiBase: string;
@@ -253,7 +254,9 @@ export class ExternalAPIAdapter implements IDatabase {
       const params = new URLSearchParams();
 
       // Always append the action directly - the vite proxy handles forwarding
-      params.append('action', action);
+      // Public (unauthenticated) reads go through the dedicated public_read
+      // endpoint so the public website can browse products/invoices without a token.
+      params.append('action', isPublic && action === 'read' ? 'public_read' : action);
       if (table) params.append('table', table);
 
       // Log the API call attempt
@@ -980,13 +983,15 @@ export class ExternalAPIAdapter implements IDatabase {
 
   async select<T>(table: string, filter?: Record<string, any>, isPublic?: boolean): Promise<ListQueryResult<T>> {
     try {
-      const { data, error } = await this.apiCall('POST', 'read', table, null, filter, isPublic);
+      const mappedTable = mapReadTable(table);
+      const mappedFilter = mapReadFilter(table, filter);
+      const { data, error } = await this.apiCall('POST', 'read', mappedTable, null, mappedFilter, isPublic);
 
       if (error) {
         return { data: [], error, count: 0 };
       }
 
-      const rows = Array.isArray(data) ? data : [];
+      const rows = Array.isArray(data) ? data.map((row) => mapRow(table, row)) : [];
       return {
         data: rows,
         error: null,
@@ -999,13 +1004,15 @@ export class ExternalAPIAdapter implements IDatabase {
 
   async selectOne<T>(table: string, id: string, isPublic?: boolean): Promise<QueryResult<T>> {
     try {
-      const { data, error } = await this.apiCall('POST', 'read', table, null, { id }, isPublic);
+      const mappedTable = mapReadTable(table);
+      const mappedFilter = mapReadFilter(table, { id });
+      const { data, error } = await this.apiCall('POST', 'read', mappedTable, null, mappedFilter, isPublic);
 
       if (error) {
         return { data: null, error };
       }
 
-      const rows = Array.isArray(data) ? data : [];
+      const rows = Array.isArray(data) ? data.map((row) => mapRow(table, row)) : [];
       return { data: rows[0] || null, error: null };
     } catch (error) {
       return { data: null, error: error as Error };
@@ -1018,7 +1025,9 @@ export class ExternalAPIAdapter implements IDatabase {
 
   async insert<T>(table: string, data: Partial<T>): Promise<InsertResult> {
     try {
-      const { data: result, error } = await this.apiCall('POST', 'create', table, data);
+      const writeTable = mapWriteTable(table);
+      const writeData = mapWriteData(table, data as Record<string, any>) || data;
+      const { data: result, error } = await this.apiCall('POST', 'create', writeTable, writeData);
 
       if (error) {
         return { id: '', error };
@@ -1035,7 +1044,9 @@ export class ExternalAPIAdapter implements IDatabase {
       // For bulk insert, we'll insert each record and track the first ID
       let firstId = '';
       for (const record of data) {
-        const { data: result, error } = await this.apiCall('POST', 'create', table, record);
+        const writeTable = mapWriteTable(table);
+        const writeData = mapWriteData(table, record as Record<string, any>) || record;
+        const { data: result, error } = await this.apiCall('POST', 'create', writeTable, writeData);
         if (!error && result?.id && !firstId) {
           firstId = result.id;
         }
@@ -1056,7 +1067,9 @@ export class ExternalAPIAdapter implements IDatabase {
         authTokenPresent: !!this.getAuthToken(),
         dataSize: JSON.stringify(data).length,
       });
-      const { error } = await this.apiCall('PUT', 'update', table, data, { id });
+      const writeTable = mapWriteTable(table);
+      const writeData = mapWriteData(table, data as Record<string, any>) || data;
+      const { error } = await this.apiCall('PUT', 'update', writeTable, writeData, { id });
       if (error) {
         console.error(`❌ Update error for ${table}/${id}:`, error.message);
       }

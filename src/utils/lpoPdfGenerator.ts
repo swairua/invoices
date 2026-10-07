@@ -61,11 +61,11 @@ export const generateLPOPDF = async (lpo: LPOPDFData, company: CompanyData) => {
   // Set font
   doc.setFont('helvetica');
 
-  // Get primary color for branding (default to orange)
-  const primaryColor = (company as any)?.primary_color || '#FF8C42';
+  // Get primary color for branding (default to maroon)
+  const primaryColor = (company as any)?.primary_color || '#800000';
   const headerColor = getColorAsRgbArray(primaryColor);
 
-  // Add logo if available
+  // Add logo if available (left side of first row)
   if (company.logo_url) {
     try {
       const logoBase64 = await loadImageAsBase64(company.logo_url);
@@ -73,38 +73,39 @@ export const generateLPOPDF = async (lpo: LPOPDFData, company: CompanyData) => {
       yPosition += 45;
     } catch (error) {
       console.warn('Failed to load logo:', error);
-      // Continue without logo on failure
-      yPosition += 5;
     }
   }
 
-  // Company Header
+  // Company Header - right aligned in same row as logo
   doc.setFontSize(20);
   doc.setTextColor(40, 40, 40);
-  doc.text(company.name, 20, yPosition);
-  yPosition += 10;
+  const rightColumnX = 120;
+  doc.text(company.name, rightColumnX, yPosition);
+  yPosition += 8;
 
   doc.setFontSize(10);
   doc.setTextColor(100, 100, 100);
+  let rightY = yPosition;
   if (company.address) {
-    doc.text(company.address, 20, yPosition);
-    yPosition += 5;
+    doc.text(company.address, rightColumnX, rightY);
+    rightY += 5;
   }
-  if (company.city || company.state || company.postal_code) {
-    const location = [company.city, company.state, company.postal_code]
-      .filter(Boolean)
-      .join(', ');
-    doc.text(location, 20, yPosition);
-    yPosition += 5;
+  if (company.city || company.country) {
+    const location = [company.city, company.country].filter(Boolean).join(', ');
+    doc.text(location, rightColumnX, rightY);
+    rightY += 5;
   }
   if (company.phone) {
-    doc.text(`Phone: ${company.phone}`, 20, yPosition);
-    yPosition += 5;
+    doc.text(`Phone: ${company.phone}`, rightColumnX, rightY);
+    rightY += 5;
   }
   if (company.email) {
-    doc.text(`Email: ${company.email}`, 20, yPosition);
-    yPosition += 5;
+    doc.text(`Email: ${company.email}`, rightColumnX, rightY);
+    rightY += 5;
   }
+
+  // Adjust yPosition to account for logo height
+  yPosition = Math.max(yPosition, 40);
 
   // Document Title
   yPosition += 10;
@@ -113,70 +114,70 @@ export const generateLPOPDF = async (lpo: LPOPDFData, company: CompanyData) => {
   doc.text('LOCAL PURCHASE ORDER', 20, yPosition);
   yPosition += 15;
 
-  // LPO Information Box
+  // LPO Details (Right side, above supplier info)
   doc.setFontSize(10);
   doc.setTextColor(0, 0, 0);
 
-  // LPO Details (Right side)
-  const rightColumnX = 120;
-  let rightY = yPosition - 5;
+  const lpoDetailsX = 120;
+  let lpoRightY = yPosition;
 
-  doc.text('LPO Number:', rightColumnX, rightY);
+  doc.text('LPO Number:', lpoDetailsX, lpoRightY);
   doc.setFont('helvetica', 'bold');
-  doc.text(lpo.lpo_number, rightColumnX + 30, rightY);
+  doc.text(lpo.lpo_number, lpoDetailsX + 30, lpoRightY);
   doc.setFont('helvetica', 'normal');
-  rightY += 8;
+  lpoRightY += 8;
 
-  doc.text('LPO Date:', rightColumnX, rightY);
-  doc.text(formatDate(lpo.lpo_date), rightColumnX + 30, rightY);
-  rightY += 8;
+  doc.text('LPO Date:', lpoDetailsX, lpoRightY);
+  doc.text(formatDate(lpo.lpo_date), lpoDetailsX + 30, lpoRightY);
+  lpoRightY += 8;
 
   if (lpo.delivery_date) {
-    doc.text('Delivery Date:', rightColumnX, rightY);
-    doc.text(formatDate(lpo.delivery_date), rightColumnX + 30, rightY);
-    rightY += 8;
+    doc.text('Delivery Date:', lpoDetailsX, lpoRightY);
+    doc.text(formatDate(lpo.delivery_date), lpoDetailsX + 30, lpoRightY);
+    lpoRightY += 8;
   }
 
-  doc.text('Status:', rightColumnX, rightY);
-  doc.text(lpo.status.toUpperCase(), rightColumnX + 30, rightY);
+  doc.text('Status:', lpoDetailsX, lpoRightY);
+  doc.text(lpo.status.toUpperCase(), lpoDetailsX + 30, lpoRightY);
 
   // Supplier Information (Left side)
+  let supplierStartY = yPosition;
   if (lpo.suppliers) {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('Supplier:', 20, yPosition);
-    yPosition += 8;
+    doc.text('Supplier:', 20, supplierStartY);
+    supplierStartY += 8;
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(lpo.suppliers.name, 20, yPosition);
-    yPosition += 6;
+    doc.text(lpo.suppliers.name, 20, supplierStartY);
+    supplierStartY += 6;
 
     if (lpo.suppliers.address) {
-      doc.text(lpo.suppliers.address, 20, yPosition);
-      yPosition += 6;
+      doc.text(lpo.suppliers.address, 20, supplierStartY);
+      supplierStartY += 6;
     }
 
     if (lpo.suppliers.city || lpo.suppliers.country) {
       const location = [lpo.suppliers.city, lpo.suppliers.country]
         .filter(Boolean)
         .join(', ');
-      doc.text(location, 20, yPosition);
-      yPosition += 6;
+      doc.text(location, 20, supplierStartY);
+      supplierStartY += 6;
     }
 
     if (lpo.suppliers.phone) {
-      doc.text(`Phone: ${lpo.suppliers.phone}`, 20, yPosition);
-      yPosition += 6;
+      doc.text(`Phone: ${lpo.suppliers.phone}`, 20, supplierStartY);
+      supplierStartY += 6;
     }
 
     if (lpo.suppliers.email) {
-      doc.text(`Email: ${lpo.suppliers.email}`, 20, yPosition);
-      yPosition += 6;
+      doc.text(`Email: ${lpo.suppliers.email}`, 20, supplierStartY);
+      supplierStartY += 6;
     }
   }
 
-  yPosition = Math.max(yPosition, rightY) + 15;
+  yPosition = Math.max(supplierStartY, lpoRightY) + 15;
 
   // Delivery Information
   if (lpo.delivery_address || lpo.contact_person || lpo.contact_phone) {

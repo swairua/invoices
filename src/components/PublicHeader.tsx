@@ -60,7 +60,7 @@ export function PublicHeader({ currentPage }: PublicHeaderProps) {
   const isCurrentPage = (page: string) => currentPage === page;
 
   return (
-    <header className="sticky top-0 bg-white shadow-md z-50 border-b border-transparent bg-gradient-to-r from-white via-white to-blue-50/30">
+    <header className="sticky top-0 bg-white shadow-md z-50 border-b border-transparent bg-gradient-to-r from-white via-white to-neutral-100/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-20 gap-8">
           {/* Logo */}

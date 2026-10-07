@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { apiClient } from '@/integrations/api';
 import { toast } from 'sonner';
 import { initializeAuth, clearAuthTokens } from '@/utils/authHelpers';
-import { logError, getUserFriendlyErrorMessage, isErrorType } from '@/utils/errorLogger';
+import { logError } from '@/utils/errorLogger';
 import { RoleDefinition, DEFAULT_ROLE_PERMISSIONS } from '@/types/permissions';
 import { normalizePermissions } from '@/utils/permissionChecker';
 
@@ -99,92 +99,69 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const lastGeneralErrorToast = useRef<number>(0);
   const TOAST_COOLDOWN = 10000; // 10 seconds between similar error toasts
 
-  // Fetch user profile from database with error handling and retry logic
+  // Build a UserProfile from the backend-resolved user object
+  const buildProfileFromUser = useCallback((rawUser: any): UserProfile | null => {
+    if (!rawUser || !rawUser.id) return null;
+
+    const role = typeof rawUser.role === 'string' && rawUser.role ? rawUser.role : (rawUser.is_admin ? 'admin' : 'user');
+    const profile: UserProfile = {
+      id: String(rawUser.id),
+      email: rawUser.email || rawUser.username || '',
+      full_name: rawUser.full_name || rawUser.first_name || '',
+      phone: rawUser.phone || '',
+      role,
+      company_id: rawUser.account_id != null ? String(rawUser.account_id) : rawUser.company_id,
+      status: 'active',
+      created_at: rawUser.created_at || new Date().toISOString(),
+      updated_at: rawUser.updated_at || new Date().toISOString(),
+    };
+
+    // Attach a default role definition so permission checks still work
+    const roleType = role.toLowerCase() as keyof typeof DEFAULT_ROLE_PERMISSIONS;
+    if (roleType && DEFAULT_ROLE_PERMISSIONS[roleType]) {
+      profile.roleDefinition = {
+        id: `default-${role}`,
+        name: role,
+        role_type: roleType as any,
+        description: `Default ${role} role`,
+        permissions: normalizePermissions(DEFAULT_ROLE_PERMISSIONS[roleType]),
+        company_id: profile.company_id,
+        is_default: true,
+        created_at: profile.created_at,
+        updated_at: profile.updated_at,
+      };
+    }
+
+    return profile;
+  }, []);
+
+  // Fetch the current user's profile from the backend (validates the JWT and
+  // returns the resolved user row from the real `users` table).
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
       console.log('📋 Fetching profile for user:', userId);
 
-      const { data: profileData, error } = await apiClient.selectOne('profiles', userId);
-
-      if (error) {
-        console.warn('⚠️ Profile fetch error:', error.message);
-        // Silently return null instead of crashing - profile might not exist
+      const { user, error } = await apiClient.auth.checkAuth();
+      if (error || !user) {
+        console.warn('⚠️ checkAuth failed while fetching profile:', error?.message);
         return null;
       }
 
-      if (!profileData) {
-        console.warn('⚠️ No profile data found for user:', userId);
-        // Return a basic user profile when full profile doesn't exist
-        return {
-          id: userId,
-          email: '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          status: 'active' // Default to active
-        };
+      const profile = buildProfileFromUser(user);
+      if (profile) {
+        console.log('✅ Profile fetched successfully:', profile);
+        return profile;
       }
-
-      // Fetch the user's role definition with permissions
-      if (profileData.role && profileData.company_id) {
-        try {
-          console.log('📋 Fetching role definition for:', profileData.role);
-          const { data: roleData } = await apiClient.selectBy('roles', {
-            name: profileData.role,
-            company_id: profileData.company_id,
-          });
-
-          if (roleData && Array.isArray(roleData) && roleData.length > 0) {
-            const role = roleData[0] as RoleDefinition;
-            // Normalize permissions to ensure they're always an array
-            const normalizedRole = {
-              ...role,
-              permissions: normalizePermissions(role.permissions)
-            };
-            console.log('✅ Role definition fetched:', normalizedRole.name, 'with', normalizedRole.permissions?.length || 0, 'permissions');
-            profileData.roleDefinition = normalizedRole;
-          } else {
-            // Fallback to default role permissions if custom role not found
-            console.log('⚠️ Custom role not found, using default permissions for:', profileData.role);
-            const roleType = profileData.role.toLowerCase() as keyof typeof DEFAULT_ROLE_PERMISSIONS;
-            if (roleType && DEFAULT_ROLE_PERMISSIONS[roleType]) {
-              profileData.roleDefinition = {
-                id: `default-${profileData.role}`,
-                name: profileData.role,
-                role_type: roleType as any,
-                description: `Default ${profileData.role} role`,
-                permissions: normalizePermissions(DEFAULT_ROLE_PERMISSIONS[roleType]),
-                company_id: profileData.company_id,
-                is_default: true,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              };
-            }
-          }
-        } catch (roleError) {
-          console.warn('⚠️ Error fetching role definition:', roleError);
-          // Continue without role definition - permissions hook will use default fallback
-        }
-      }
-
-      console.log('✅ Profile fetched successfully:', profileData);
-      return profileData;
+      return null;
     } catch (error) {
       console.warn('⚠️ Exception fetching profile:', error);
       logError('Exception fetching profile:', error, { userId, context: 'fetchProfile' });
-
-      // Return a minimal valid profile instead of null
-      // This allows the app to function even if full profile data isn't available
-      return {
-        id: userId,
-        email: '',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        status: 'active'
-      };
+      return null;
     }
-  }, []);
+  }, [buildProfileFromUser]);
 
-  // Update last login timestamp silently
+  // Update last login timestamp silently (writes to the added `profiles` table
+  // only - never touches the real `users` table).
   const updateLastLogin = useCallback(async (userId: string) => {
     try {
       await apiClient.update('profiles', userId, {
@@ -212,43 +189,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         console.log('🔍 Attempting to restore auth session...');
 
-        const sessionResult = await apiClient.auth.getSession();
-        const quickSession = sessionResult?.session;
+        const token = localStorage.getItem('med_api_token');
 
-        if (quickSession?.user && mountedRef.current) {
-          console.log('✅ Auth session restored from localStorage');
+        if (token) {
+          // Validate the token against the backend and recover the full user
+          const { user, error } = await apiClient.auth.checkAuth();
 
-          // Fetch profile silently in background
-          try {
-            const userProfile = await fetchProfile(quickSession.user.id);
-            if (mountedRef.current && userProfile) {
-              setSession(quickSession);
-              setUser(quickSession.user);
+          if (!error && user && mountedRef.current) {
+            console.log('✅ Auth session restored from backend (checkAuth)');
+
+            const session: Session = {
+              user: {
+                id: String(user.id),
+                email: user.email || '',
+              },
+              access_token: token,
+            };
+            setSession(session);
+            setUser(session.user);
+
+            // Rebuild the full profile from the resolved user row
+            const userProfile = buildProfileFromUser(user);
+            if (mountedRef.current) {
               setProfile(userProfile);
 
               // Update last login silently
-              updateLastLogin(quickSession.user.id).catch(err =>
-                logError('Error updating last login:', err, {
-                  userId: quickSession.user.id,
-                  context: 'backgroundAuth'
-                })
-              );
-            } else if (mountedRef.current) {
-              clearAuthTokens();
-              setSession(null);
-              setUser(null);
-              setProfile(null);
+              if (userProfile) {
+                updateLastLogin(session.user.id).catch(err =>
+                  logError('Error updating last login:', err, {
+                    userId: session.user.id,
+                    context: 'backgroundAuth'
+                  })
+                );
+              }
             }
-          } catch (profileError) {
+          } else {
+            // Token is invalid/expired - clear it so the user is redirected to login
+            console.warn('ℹ️ checkAuth failed during restore, clearing token');
             clearAuthTokens();
-            if (mountedRef.current) {
-              setSession(null);
-              setUser(null);
-              setProfile(null);
-            }
-            logError('Error fetching profile in background:', profileError, {
-              context: 'backgroundProfileFetch'
-            });
           }
         } else {
           // No valid session found - user is not authenticated
@@ -347,20 +325,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Create session object
       const newSession: Session = {
         user: {
-          id: result.user.id,
+          id: String(result.user.id),
           email: result.user.email || email,
-          user_metadata: result.user.user_metadata,
-          app_metadata: result.user.app_metadata,
         },
         access_token: result.token,
       };
 
-      // Fetch profile to check status
-      console.log('📋 Fetching user profile...');
-      const userProfile = await fetchProfile(result.user.id);
-
-      // Allow login even if profile fetch fails - better UX
-      console.log('✅ Profile fetch completed, setting session...');
+      // Build the profile from the resolved user returned by the backend
+      // (contains role, is_admin, account_id, full_name from the real `users` table)
+      const userProfile = buildProfileFromUser(result.user);
+      console.log('✅ Profile built from login response');
 
       setSession(newSession);
       setUser(newSession.user);
@@ -381,7 +355,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const authError = new AuthError(errorMsg);
       return { error: authError };
     }
-  }, [fetchProfile]);
+  }, [buildProfileFromUser]);
 
   const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
     try {
@@ -456,10 +430,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const resetPassword = useCallback(async (email: string) => {
     try {
-      // Call API to reset password
-      const result = await apiClient.select('profiles', { email });
+      // Check if the account exists in the real `users` table
+      const result = await apiClient.select('users', { email });
 
-      if (result.error || !result.data) {
+      if (result.error || !result.data || (Array.isArray(result.data) && result.data.length === 0)) {
         return { error: new AuthError('User not found') };
       }
 

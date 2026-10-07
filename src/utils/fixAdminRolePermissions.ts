@@ -1,10 +1,20 @@
 /**
- * Utility to fix admin role permissions
- * Ensures the admin role has all necessary permissions including view_inventory
+ * Utility to fix admin role permissions.
+ * Ensures the admin role has all necessary permissions including view_inventory.
+ *
+ * NOTE: This app is migrated to the external API (api.php) and no longer uses
+ * the Supabase `roles` table. Admin permissions are enforced in-memory via
+ * DEFAULT_ROLE_PERMISSIONS.admin (which already includes view_inventory).
+ * These functions therefore treat a missing roles table / missing admin role as
+ * "permission granted" so the restrictive banner never blocks admins, while
+ * still supporting environments that maintain a real `roles` table.
  */
-
-import { supabase } from '@/integrations/supabase/client';
-import { DEFAULT_ROLE_PERMISSIONS } from '@/types/permissions';
+import { getDatabase } from '@/integrations/database';
+import {
+  DEFAULT_ROLE_PERMISSIONS,
+  Permission,
+} from '@/types/permissions';
+import { normalizePermissions } from '@/utils/permissionChecker';
 
 export interface FixRolePermissionsResult {
   success: boolean;
@@ -14,188 +24,166 @@ export interface FixRolePermissionsResult {
   error?: string;
 }
 
-/**
- * Retry logic with exponential backoff for API calls
- */
-async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  maxAttempts: number = 3,
-  baseDelay: number = 1000
-): Promise<T> {
-  let lastError: Error | null = null;
+const isMissingTableError = (msg: string) =>
+  /doesn't exist|doesn`t exist|table .* doesn't exist|Base table or view not found|1146|42S02/i.test(
+    msg || ''
+  );
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+function roleHasPermission(role: any, permission: Permission): boolean {
+  if (!role) return false;
+  let perms = role.permissions || [];
+  if (typeof perms === 'string') {
     try {
-      return await fn();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      if (attempt < maxAttempts) {
-        // Calculate delay with exponential backoff: 1s, 2s, 4s
-        const delay = baseDelay * Math.pow(2, attempt - 1);
-        console.warn(
-          `Attempt ${attempt} failed, retrying in ${delay}ms:`,
-          lastError.message
-        );
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+      perms = JSON.parse(perms);
+    } catch {
+      perms = [];
     }
   }
-
-  throw lastError;
+  return Array.isArray(perms) && perms.includes(permission);
 }
 
-/**
- * Fix admin role permissions - add missing permissions
- */
-export async function fixAdminRolePermissions(companyId: string): Promise<FixRolePermissionsResult> {
-  try {
-    // Fetch with retry logic to handle timeouts
-    const adminRole = await retryWithBackoff(async () => {
-      const { data, error } = await supabase
-        .from('roles')
-        .select('*')
-        .eq('name', 'admin')
-        .eq('company_id', companyId)
-        .maybeSingle();
-
-      if (error) {
-        throw error;
-      }
-
-      return data;
-    });
-
-    if (!adminRole) {
-      return {
-        success: false,
-        message: 'Admin role not found in database',
-        error: `No admin role found for company ${companyId}`,
-      };
-    }
-
-    // Get default admin permissions
-    const defaultPermissions = DEFAULT_ROLE_PERMISSIONS.admin;
-
-    // Get current permissions (handle both array and JSONB formats)
-    let currentPermissions = adminRole.permissions || [];
-    if (typeof currentPermissions === 'string') {
-      try {
-        currentPermissions = JSON.parse(currentPermissions);
-      } catch {
-        currentPermissions = [];
-      }
-    }
-
-    // Find missing permissions
-    const missingPermissions = defaultPermissions.filter(
-      (perm) => !currentPermissions.includes(perm)
-    );
-
-    if (missingPermissions.length === 0) {
-      return {
-        success: true,
-        message: 'Admin role already has all permissions',
-        role: adminRole,
-        addedPermissions: [],
-      };
-    }
-
-    // Add missing permissions with retry logic
-    const updatedRole = await retryWithBackoff(async () => {
-      const { data, error } = await supabase
-        .from('roles')
-        .update({
-          permissions: [...currentPermissions, ...missingPermissions],
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', adminRole.id)
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      return data;
-    });
-
-    return {
-      success: true,
-      message: `Successfully added ${missingPermissions.length} missing permissions to admin role`,
-      role: updatedRole,
-      addedPermissions: missingPermissions,
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    // Provide helpful guidance for timeout errors
-    let userMessage = 'Unexpected error while fixing admin role permissions';
-    if (errorMessage.includes('timeout') || errorMessage.includes('unresponsive')) {
-      userMessage = 'The server is taking too long to respond. This may be a temporary issue. Please try again.';
-    }
-
-    return {
-      success: false,
-      message: userMessage,
-      error: errorMessage,
-    };
-  }
+function normalizeRolePermissions(role: any) {
+  if (!role) return role;
+  return { ...role, permissions: normalizePermissions(role.permissions) };
 }
 
-/**
- * Check if admin role has view_inventory permission
- */
 export async function checkAdminInventoryPermission(companyId: string): Promise<{
   hasPermission: boolean;
   role: any | null;
   error?: string;
 }> {
   try {
-    // Fetch with retry logic
-    const adminRole = await retryWithBackoff(async () => {
-      const { data, error } = await supabase
-        .from('roles')
-        .select('*')
-        .eq('name', 'admin')
-        .eq('company_id', companyId)
-        .maybeSingle();
-
-      if (error) {
-        throw error;
-      }
-
-      return data;
+    const db = getDatabase();
+    const result = await db.select('roles', {
+      name: 'admin',
+      ...(companyId ? { company_id: companyId } : {}),
     });
 
+    if (result.error) {
+      const msg =
+        result.error instanceof Error ? result.error.message : String(result.error);
+
+      // If the roles table doesn't exist, admin permissions are enforced by the
+      // in-memory defaults (admin always has view_inventory). Don't block the UI.
+      if (isMissingTableError(msg)) {
+        return {
+          hasPermission: true,
+          role: null,
+        };
+      }
+    }
+
+    const adminRole = result.data?.[0] || null;
+
     if (!adminRole) {
+      // No stored role: rely on the default admin policy (includes view_inventory).
       return {
-        hasPermission: false,
+        hasPermission: Array.isArray(DEFAULT_ROLE_PERMISSIONS.admin)
+          ? DEFAULT_ROLE_PERMISSIONS.admin.includes('view_inventory')
+          : true,
         role: null,
-        error: 'Admin role not found',
       };
     }
 
-    let permissions = adminRole.permissions || [];
-    if (typeof permissions === 'string') {
-      try {
-        permissions = JSON.parse(permissions);
-      } catch {
-        permissions = [];
+    return {
+      hasPermission: roleHasPermission(adminRole, 'view_inventory'),
+      role: normalizeRolePermissions(adminRole),
+    };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : String(error);
+
+    if (isMissingTableError(errorMessage)) {
+      return { hasPermission: true, role: null };
+    }
+    return { hasPermission: false, role: null, error: errorMessage };
+  }
+}
+
+export async function fixAdminRolePermissions(
+  companyId: string
+): Promise<FixRolePermissionsResult> {
+  try {
+    const db = getDatabase();
+
+    // Look up the admin role (read-only).
+    const result = await db.select('roles', {
+      name: 'admin',
+      ...(companyId ? { company_id: companyId } : {}),
+    });
+
+    if (result.error) {
+      const msg =
+        result.error instanceof Error ? result.error.message : String(result.error);
+
+      // Roles table absent: permissions are governed by DEFAULT_ROLE_PERMISSIONS,
+      // which already includes view_inventory for admins. Nothing to fix.
+      if (isMissingTableError(msg)) {
+        return {
+          success: true,
+          message:
+            'Admin permissions are enforced by default policy and already include inventory access.',
+        };
       }
     }
 
-    const hasPermission = Array.isArray(permissions) && permissions.includes('view_inventory');
+    const adminRole = result.data?.[0] || null;
+
+    if (!adminRole) {
+      return {
+        success: true,
+        message:
+          'Admin role uses default permissions (including inventory access). No stored role to update.',
+      };
+    }
+
+    const defaultPermissions = DEFAULT_ROLE_PERMISSIONS.admin;
+    const currentPermissions = normalizePermissions(adminRole.permissions) ?? [];
+    const missing = defaultPermissions.filter(
+      (p) => !currentPermissions.includes(p)
+    );
+
+    if (missing.length === 0) {
+      return {
+        success: true,
+        message: 'Admin role already has all permissions',
+        role: normalizeRolePermissions(adminRole),
+        addedPermissions: [],
+      };
+    }
+
+    // Add the missing permissions to the stored admin role.
+    const { error: updateError } = await db.update(
+      'roles',
+      String(adminRole.id),
+      {
+        permissions: [...currentPermissions, ...missing],
+        updated_at: new Date().toISOString(),
+      }
+    );
+
+    if (updateError) {
+      return {
+        success: false,
+        message: 'Could not update admin role permissions',
+        error:
+          updateError instanceof Error
+            ? updateError.message
+            : String(updateError),
+      };
+    }
 
     return {
-      hasPermission,
-      role: adminRole,
+      success: true,
+      message: `Successfully added ${missing.length} missing permissions to admin role`,
+      addedPermissions: missing,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage =
+      error instanceof Error ? error.message : String(error);
     return {
-      hasPermission: false,
-      role: null,
+      success: false,
+      message: 'Unexpected error while fixing admin role permissions',
       error: errorMessage,
     };
   }

@@ -78,7 +78,7 @@ export function Header({ onMenuToggle, isMobileMenuOpen }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden h-11 w-11 text-orange-500 hover:text-orange-600"
+          className="md:hidden h-11 w-11 text-maroon hover:text-neutral-700"
           onClick={onMenuToggle}
           aria-label="Toggle menu"
         >

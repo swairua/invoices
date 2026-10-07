@@ -81,9 +81,10 @@ export async function reconcileInvoiceBalance(
     const balanceDiscrepancy = Math.abs(storedBalance - calculatedBalance);
     const statusMismatch = invoice.status !== expectedStatus;
 
-    // We only consider it a discrepancy if items exist and their sum doesn't match total_amount,
-    // or if the balance/paid amounts are wrong.
-    const hasTotalDiscrepancy = items.length > 0 && totalDiscrepancy > 0.01;
+    // total_amount is always present on reads (schema-map aliases amount), and
+    // the write path maps total_amount -> amount on the real Invoice Ninja table.
+    const hasTotalAmountColumn = 'total_amount' in invoice;
+    const hasTotalDiscrepancy = hasTotalAmountColumn && items.length > 0 && totalDiscrepancy > 0.01;
     const hasDiscrepancy = hasTotalDiscrepancy || paidAmountDiscrepancy > 0.01 || balanceDiscrepancy > 0.01 || statusMismatch;
 
     const result: ReconciliationResult = {
@@ -104,13 +105,19 @@ export async function reconcileInvoiceBalance(
 
     // 6. Fix if requested and needed
     if (fix && hasDiscrepancy) {
-      const updateResult = await db.update('invoices', invoiceId, {
-        total_amount: effectiveTotalAmount,
+      const updateData: any = {
         paid_amount: calculatedPaidAmount,
         balance_due: calculatedBalance,
         status: expectedStatus,
         updated_at: new Date().toISOString()
-      });
+      };
+
+      // Only include total_amount if the column exists in the invoice record
+      if (hasTotalAmountColumn) {
+        updateData.total_amount = effectiveTotalAmount;
+      }
+
+      const updateResult = await db.update('invoices', invoiceId, updateData);
 
       if (updateResult.error) {
         result.error = updateResult.error.message || 'Update failed';

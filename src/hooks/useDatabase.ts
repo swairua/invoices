@@ -528,9 +528,19 @@ export function useCreateLPO() {
   const { db } = useDatabase();
 
   return useMutation({
-    mutationFn: async (lpoData: any) => {
-      const result = await db.insert('lpos', lpoData);
+    mutationFn: async ({ lpo, items }: { lpo: any; items?: any[] }) => {
+      const result = await db.insert('lpos', lpo);
       if (result.error) throw result.error;
+
+      if (items && items.length > 0) {
+        const itemRows = items.map((item, index) => ({
+          ...item,
+          lpo_id: result.id,
+          sort_order: index,
+        }));
+        const itemsResult = await db.insertMany('lpo_items', itemRows);
+        if (itemsResult.error) throw itemsResult.error;
+      }
 
       // Fetch the created record
       const { data } = await db.selectOne('lpos', result.id);
@@ -739,6 +749,30 @@ export function useCreateRemittanceAdvice() {
     onError: (error: any) => {
       console.error('Error creating remittance advice:', error);
       const message = error?.message || 'Failed to create remittance advice';
+      toast.error(message);
+    },
+  });
+}
+
+/**
+ * Hook to create remittance advice items
+ */
+export function useCreateRemittanceAdviceItems() {
+  const queryClient = useQueryClient();
+  const { db } = useDatabase();
+
+  return useMutation({
+    mutationFn: async (items: any[]) => {
+      const result = await db.insertMany('remittance_advice_items', items);
+      if (result.error) throw result.error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['remittance_advice_items'] });
+    },
+    onError: (error: any) => {
+      console.error('Error creating remittance advice items:', error);
+      const message = error?.message || 'Failed to create remittance advice items';
       toast.error(message);
     },
   });

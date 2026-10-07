@@ -95,20 +95,20 @@ export function EnhancedLogin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-neutral-100 via-neutral-100 to-neutral-50 p-4 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-orange-300/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob hidden sm:block"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-amber-300/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000 hidden sm:block"></div>
-        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-yellow-300/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000 hidden sm:block"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-maroon/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob hidden sm:block"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-neutral-400/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000 hidden sm:block"></div>
+        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-neutral-300/20 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000 hidden sm:block"></div>
       </div>
 
       <div className="relative z-10 w-full sm:max-w-lg md:max-w-2xl">
         <Card className="w-full shadow-2xl border-2 border-white/80 backdrop-blur-sm">
-          <CardHeader className="text-center space-y-4 sm:space-y-6 bg-gradient-to-b from-orange-50/50 to-transparent p-6 sm:p-8">
+          <CardHeader className="text-center space-y-4 sm:space-y-6 bg-gradient-to-b from-neutral-100/50 to-transparent p-6 sm:p-8">
             {/* Animated Logo */}
             <div className="mx-auto" style={{ animationDuration: '2s' }}>
-              <div className="bg-gradient-to-br from-orange-500 to-amber-500 p-2 sm:p-3 rounded-2xl inline-block shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <div className="bg-gradient-to-br from-maroon to-neutral-700 p-2 sm:p-3 rounded-2xl inline-block shadow-lg hover:shadow-xl transition-shadow duration-300">
                 {companyLoading ? (
                   <div className="h-16 w-16 flex items-center justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
@@ -128,12 +128,12 @@ export function EnhancedLogin() {
               {companyLoading ? (
                 <div className="h-10 sm:h-12 md:h-14 flex items-center justify-center">
                   <div className="inline-flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-orange-500 border-t-transparent"></div>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-maroon border-t-transparent"></div>
                     <span className="text-sm sm:text-base text-gray-600">Loading...</span>
                   </div>
                 </div>
               ) : (
-                <CardTitle className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-600 bg-clip-text text-transparent">
+                <CardTitle className="text-2xl sm:text-3xl md:text-4xl font-bold text-maroon">
                   {companyName}
                 </CardTitle>
               )}
@@ -144,9 +144,9 @@ export function EnhancedLogin() {
 
             {/* Decorative line */}
             <div className="flex items-center gap-3 justify-center mt-3 sm:mt-4">
-              <div className="h-1 w-8 bg-gradient-to-r from-orange-500 to-transparent"></div>
-              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-              <div className="h-1 w-8 bg-gradient-to-l from-amber-500 to-transparent"></div>
+              <div className="h-1 w-8 bg-gradient-to-r from-maroon to-transparent"></div>
+              <div className="w-2 h-2 bg-maroon rounded-full"></div>
+              <div className="h-1 w-8 bg-gradient-to-l from-neutral-600 to-transparent"></div>
             </div>
           </CardHeader>
 
@@ -154,7 +154,7 @@ export function EnhancedLogin() {
             {companyLoading && (
               <div className="text-center py-4">
                 <div className="inline-flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-orange-500 border-t-transparent"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-maroon border-t-transparent"></div>
                   <p className="text-sm text-gray-600">Loading company information...</p>
                 </div>
               </div>
@@ -166,14 +166,14 @@ export function EnhancedLogin() {
                   <span className="text-base sm:text-lg">📧</span> Email Address
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 sm:left-4 top-1/2 h-4 w-4 sm:h-5 sm:w-5 -translate-y-1/2 text-orange-500 group-focus-within:text-amber-500 transition-colors" />
+                  <Mail className="absolute left-3 sm:left-4 top-1/2 h-4 w-4 sm:h-5 sm:w-5 -translate-y-1/2 text-maroon group-focus-within:text-neutral-600 transition-colors" />
                   <Input
                     id="email"
                     type="email"
                     placeholder="your@email.com"
                     value={formData.email}
                     onChange={handleInputChange('email')}
-                    className={`pl-10 sm:pl-12 py-2 sm:py-3 text-sm sm:text-base border-2 rounded-lg transition-all duration-300 hover:border-orange-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 ${
+                    className={`pl-10 sm:pl-12 py-2 sm:py-3 text-sm sm:text-base border-2 rounded-lg transition-all duration-300 hover:border-neutral-300 focus:border-maroon focus:ring-2 focus:ring-neutral-200 ${
                       formErrors.email ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : 'border-gray-200'
                     }`}
                     disabled={submitting || companyLoading}
@@ -192,14 +192,14 @@ export function EnhancedLogin() {
                   <span className="text-base sm:text-lg">🔐</span> Password
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 sm:left-4 top-1/2 h-4 w-4 sm:h-5 sm:w-5 -translate-y-1/2 text-orange-500 group-focus-within:text-amber-500 transition-colors" />
+                  <Lock className="absolute left-3 sm:left-4 top-1/2 h-4 w-4 sm:h-5 sm:w-5 -translate-y-1/2 text-maroon group-focus-within:text-neutral-600 transition-colors" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleInputChange('password')}
-                    className={`pl-10 sm:pl-12 pr-10 sm:pr-12 py-2 sm:py-3 text-sm sm:text-base border-2 rounded-lg transition-all duration-300 hover:border-orange-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 ${
+                    className={`pl-10 sm:pl-12 pr-10 sm:pr-12 py-2 sm:py-3 text-sm sm:text-base border-2 rounded-lg transition-all duration-300 hover:border-neutral-300 focus:border-maroon focus:ring-2 focus:ring-neutral-200 ${
                       formErrors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : 'border-gray-200'
                     }`}
                     disabled={submitting || companyLoading}
@@ -208,7 +208,7 @@ export function EnhancedLogin() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-2 top-1/2 h-8 w-8 sm:h-9 sm:w-9 -translate-y-1/2 hover:bg-orange-100 text-gray-600 hover:text-orange-600 transition-colors"
+                    className="absolute right-2 top-1/2 h-8 w-8 sm:h-9 sm:w-9 -translate-y-1/2 hover:bg-neutral-100 text-gray-600 hover:text-maroon transition-colors"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={submitting || companyLoading}
                   >
@@ -230,7 +230,7 @@ export function EnhancedLogin() {
               <div className="space-y-2 sm:space-y-3 pt-3 sm:pt-4">
                 <Button
                   type="submit"
-                  className="w-full py-2 sm:py-3 text-base sm:text-lg font-bold bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 active:scale-95 rounded-lg"
+                  className="w-full py-2 sm:py-3 text-base sm:text-lg font-bold bg-gradient-to-r from-maroon to-neutral-700 hover:from-maroon/90 hover:to-neutral-800 text-white shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105 active:scale-95 rounded-lg"
                   disabled={submitting || companyLoading}
                 >
                   {submitting ? (
