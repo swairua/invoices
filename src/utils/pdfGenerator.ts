@@ -1,7 +1,7 @@
 import { lightenColor, getColorAsHslVar } from './colorUtils';
 import { renderHeaderHTML, getTemplateCSS, TemplateName } from './pdfTemplates';
 import { generateDocumentNumberAPI } from './documentNumbering';
-import { resolveCurrency, resolvePdfBackground } from './activeCompanyConfig';
+import { resolveCurrency, resolvePdfBackground, preloadPdfBackground } from './activeCompanyConfig';
 
 // PDF Generation utility using HTML to print/PDF conversion
 // Since we don't have jsPDF installed, I'll create a simple HTML-to-print function
@@ -808,11 +808,25 @@ export const generatePDF = (data: DocumentData, downloadAsFile: boolean = true) 
         <div class="footer">
           ${(() => {
             const enabledDocs = company.pdf_footer_enabled_docs;
-            const isEnabled = Array.isArray(enabledDocs)
-              ? enabledDocs.includes(data.type)
-              : typeof enabledDocs === 'string'
-                ? JSON.parse(enabledDocs || '[]').includes(data.type)
-                : false;
+            let parsedDocs: string[] = [];
+            if (Array.isArray(enabledDocs)) {
+              parsedDocs = enabledDocs;
+            } else if (typeof enabledDocs === 'string' && enabledDocs.trim() !== '') {
+              try {
+                let parsed: unknown = JSON.parse(enabledDocs);
+                let guard = 0;
+                while (typeof parsed === 'string' && guard < 5) {
+                  parsed = JSON.parse(parsed as string);
+                  guard++;
+                }
+                if (Array.isArray(parsed)) {
+                  parsedDocs = parsed.filter((v): v is string => typeof v === 'string');
+                }
+              } catch {
+                parsedDocs = [];
+              }
+            }
+            const isEnabled = parsedDocs.includes(data.type);
 
             if (isEnabled && (company.pdf_footer_line1 || company.pdf_footer_line2)) {
               return `
@@ -867,18 +881,21 @@ export const generatePDF = (data: DocumentData, downloadAsFile: boolean = true) 
       iframe.src = url;
       document.body.appendChild(iframe);
 
-      // Trigger print after iframe loads
+      // Trigger print after iframe loads (and the background image is decoded)
       iframe.onload = () => {
-        setTimeout(() => {
-          iframe.focus();
-          iframe.contentWindow?.print();
-
-          // Clean up after a delay
+        void (async () => {
+          await preloadPdfBackground(background.url);
           setTimeout(() => {
-            document.body.removeChild(iframe);
-            window.URL.revokeObjectURL(url);
-          }, 500);
-        }, 300);
+            iframe.focus();
+            iframe.contentWindow?.print();
+
+            // Clean up after a delay
+            setTimeout(() => {
+              document.body.removeChild(iframe);
+              window.URL.revokeObjectURL(url);
+            }, 500);
+          }, 300);
+        })();
       };
 
       return iframe;
@@ -893,11 +910,14 @@ export const generatePDF = (data: DocumentData, downloadAsFile: boolean = true) 
       printWindow.document.write(htmlContent);
       printWindow.document.close();
 
-      // Wait for content to load before printing
+      // Wait for content (and the background image) to load before printing
       printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-        }, 500);
+        void (async () => {
+          await preloadPdfBackground(background.url);
+          setTimeout(() => {
+            printWindow.print();
+          }, 500);
+        })();
       };
 
       // Fallback if onload doesn't fire

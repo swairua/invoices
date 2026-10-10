@@ -57,6 +57,31 @@ const toOpacityString = (value: unknown, fallback: string = '100'): string => {
   return String(Math.min(100, Math.max(0, Math.round(parsed))));
 };
 
+// Normalise the PDF footer docs setting to a string array. The native backend
+// returns the raw JSON string, which must not be re-stringified on save
+// (that double-encodes it more with every save cycle).
+const parseFooterDocs = (value: unknown, fallback: string[] = []): string[] => {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string');
+  if (typeof value === 'string' && value.trim() !== '') {
+    try {
+      let parsed: unknown = JSON.parse(value);
+      // Unwind any layers of double-encoding from earlier saves
+      let guard = 0;
+      while (typeof parsed === 'string' && guard < 5) {
+        parsed = JSON.parse(parsed);
+        guard++;
+      }
+      if (Array.isArray(parsed)) return parsed.filter((v): v is string => typeof v === 'string');
+    } catch {
+      // Fall through to the single-value handling below
+    }
+    // Plain comma-separated or single value
+    const single = value.trim();
+    if (single && !single.startsWith('[')) return [single];
+  }
+  return fallback;
+};
+
 export default function CompanySettings() {
   const { profile: currentUser } = useAuth();
   const { role, loading } = usePermissions();
@@ -171,7 +196,7 @@ export default function CompanySettings() {
       pdf_template: currentCompany?.pdf_template || prev.pdf_template,
       pdf_footer_line1: currentCompany?.pdf_footer_line1 || prev.pdf_footer_line1,
       pdf_footer_line2: currentCompany?.pdf_footer_line2 || prev.pdf_footer_line2,
-      pdf_footer_enabled_docs: currentCompany?.pdf_footer_enabled_docs ?? prev.pdf_footer_enabled_docs,
+      pdf_footer_enabled_docs: parseFooterDocs(currentCompany?.pdf_footer_enabled_docs, prev.pdf_footer_enabled_docs),
       pdf_background_image: companyConfig.pdf_background_image ?? currentCompany?.pdf_background_image ?? prev.pdf_background_image,
       pdf_background_opacity: toOpacityString(companyConfig.pdf_background_opacity ?? currentCompany?.pdf_background_opacity ?? prev.pdf_background_opacity),
     }));

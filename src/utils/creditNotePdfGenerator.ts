@@ -1,6 +1,6 @@
 import type { CreditNote } from '@/hooks/useCreditNotes';
 import { lightenColor, getColorAsHslVar } from './colorUtils';
-import { resolveCurrency, resolvePdfBackground } from './activeCompanyConfig';
+import { resolveCurrency, resolvePdfBackground, preloadPdfBackground } from './activeCompanyConfig';
 
 export interface CreditNotePDFData extends CreditNote {
   customers: {
@@ -602,9 +602,12 @@ export const generateCreditNotePDF = (creditNote: CreditNotePDFData, company?: C
   printWindow.document.close();
 
   printWindow.onload = () => {
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
+    void (async () => {
+      await preloadPdfBackground(background.url);
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    })();
   };
 
   setTimeout(() => {

@@ -100,3 +100,42 @@ export function resolvePdfBackground(company?: {
 
   return { url: absoluteUrl, opacity: percent / 100 };
 }
+
+/**
+ * Preload the PDF background image so it is decoded before printing.
+ * Warms the browser cache shared with the print iframe/window.
+ * Always resolves - on load, on error, or after the timeout -
+ * so printing is never blocked by a slow or missing image.
+ */
+export function preloadPdfBackground(url: string, timeoutMs: number = 4000): Promise<void> {
+  return new Promise((resolve) => {
+    if (!url) {
+      resolve();
+      return;
+    }
+    let settled = false;
+    const done = () => {
+      if (!settled) {
+        settled = true;
+        resolve();
+      }
+    };
+    const timer = setTimeout(done, timeoutMs);
+    try {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => {
+        clearTimeout(timer);
+        done();
+      };
+      img.onerror = () => {
+        clearTimeout(timer);
+        done();
+      };
+      img.src = url;
+    } catch {
+      clearTimeout(timer);
+      done();
+    }
+  });
+}
