@@ -1,0 +1,18 @@
+{
+    "id": 1,
+    "name": "Haemonetics East Africa Limited",
+    "email": "sales@heal.co.ke",
+    "phone": "+254 207 863 782",
+    "address": "Naivasha Road, Kamrose Plaza, 1st Flr, Rm 14",
+    "city": "Nairobi",
+    "state": "Nairobi",
+    "country": "Kenya",
+    "postal_code": "P.O Box 61214-00200, Nairobi",
+    "currency": "KES",
+    "website": "https:\/\/www.heal.co.ke",
+    "description": "Haemonetics East Africa Limited supplies laboratory reagents, instrumentation and diagnostic equipment to hospitals, universities, research and industrial clients across East Africa.",
+    "logo_url": "http:\/\/localhost:8082\/invoicing\/public\/uploads\/img_6a78f46f2cff37.58768113.png",
+    "primary_color": "#0d9488",
+    "secondary_color": "#000000",
+    "status": "active"
+}

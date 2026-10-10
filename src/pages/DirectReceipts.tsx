@@ -43,6 +43,7 @@ import { downloadInvoicePDF } from '@/utils/pdfGenerator';
 import { CreateDirectReceiptModalEnhanced } from '@/components/payments/CreateDirectReceiptModalEnhanced';
 import { ViewReceiptModal } from '@/components/payments/ViewReceiptModal';
 import { apiClient } from '@/integrations/api';
+import { getClientApiUrl } from '@/utils/getApiUrl';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -395,11 +396,11 @@ export default function DirectReceipts() {
     setIsDeleting(true);
     try {
       // Use transaction-safe deletion endpoint for atomic operation
-      const response = await fetch('/api?action=delete_receipt_with_cascade', {
+      const response = await fetch(`${getClientApiUrl()}?action=delete_receipt_with_cascade`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          'Authorization': `Bearer ${localStorage.getItem('med_api_token') || ''}`
         },
         body: JSON.stringify({
           receipt_id: receiptToDelete.id

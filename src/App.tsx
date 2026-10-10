@@ -87,7 +87,11 @@ const App = () => {
         <Route path="/login" element={<Login />} />
 
         {/* Public website routes - no auth, no app Layout */}
-        <Route path="/" element={<PublicSite />} />
+        {/* Landing page switched off for now: "/" shows login instead.
+            Reactivate later by restoring: <Route path="/" element={<PublicSite />} />
+            and removing the /home alias below. */}
+        <Route path="/home" element={<PublicSite />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/products" element={<PublicProducts />} />
 
         {/* All other routes wrapped in Layout */}

@@ -430,8 +430,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const resetPassword = useCallback(async (email: string) => {
     try {
-      // Check if the account exists in the real `users` table
-      const result = await apiClient.select('users', { email });
+      // Check if the account exists via the `profiles` table (never read the
+      // `users` table from the client - it holds password hashes)
+      const result = await apiClient.select('profiles', { email });
 
       if (result.error || !result.data || (Array.isArray(result.data) && result.data.length === 0)) {
         return { error: new AuthError('User not found') };

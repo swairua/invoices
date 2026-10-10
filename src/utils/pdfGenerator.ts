@@ -1,6 +1,7 @@
 import { lightenColor, getColorAsHslVar } from './colorUtils';
 import { renderHeaderHTML, getTemplateCSS, TemplateName } from './pdfTemplates';
 import { generateDocumentNumberAPI } from './documentNumbering';
+import { resolveCurrency, resolvePdfBackground } from './activeCompanyConfig';
 
 // PDF Generation utility using HTML to print/PDF conversion
 // Since we don't have jsPDF installed, I'll create a simple HTML-to-print function
@@ -88,6 +89,8 @@ interface CompanyDetails {
   pdf_footer_line2?: string;
   pdf_footer_enabled_docs?: string[] | string;
   currency?: string;
+  pdf_background_image?: string;
+  pdf_background_opacity?: number | string;
 }
 
 // Default company details (fallback) - logo will be determined dynamically
@@ -141,12 +144,36 @@ export const generatePDF = (data: DocumentData, downloadAsFile: boolean = true) 
   // Get PDF template (defaults to 'default' for backward compatibility)
   const templateName = data.pdfTemplate || company.pdf_template || 'default';
 
+  // Full-page background image (admin setting in Company Settings > Branding)
+  const background = resolvePdfBackground(company);
+  const backgroundCSS = background.url ? `
+        .page {
+          isolation: isolate;
+        }
+        .pdf-bg-layer {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image: url("${background.url.replace(/"/g, '\\"')}");
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          opacity: ${background.opacity};
+          z-index: -1;
+          pointer-events: none;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }` : '';
+  const backgroundHTML = background.url ? '<div class="pdf-bg-layer"></div>' : '';
+
   // Analyze which columns have values
   const visibleColumns = analyzeColumns(data.items);
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
-      currency: company.currency || 'USD',
+      currency: resolveCurrency(company.currency),
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount);
@@ -175,6 +202,7 @@ export const generatePDF = (data: DocumentData, downloadAsFile: boolean = true) 
       <title>${documentTitle} ${data.number}</title>
       <meta charset="UTF-8">
       <style>
+        ${backgroundCSS}
         @page {
           size: A4;
           margin: 15mm;
@@ -523,6 +551,7 @@ export const generatePDF = (data: DocumentData, downloadAsFile: boolean = true) 
     </head>
     <body>
       <div class="page">
+        ${backgroundHTML}
         <!-- Watermark for proforma invoices -->
         ${data.type === 'proforma' ? '<div class="watermark">Proforma</div>' : ''}
         
@@ -910,9 +939,9 @@ export const generatePDF = (data: DocumentData, downloadAsFile: boolean = true) 
 
 // Function for generating payment receipt PDF with payment details
 export const generatePaymentReceiptPDF = async (payment: any, company?: CompanyDetails) => {
-  // Format payment amount
+  // Format payment amount (amounts may be prefixed with any currency symbol/code)
   const paymentAmount = typeof payment.amount === 'string' ?
-    parseFloat(payment.amount.replace('$', '').replace(',', '')) :
+    parseFloat(payment.amount.replace(/[^0-9.-]+/g, '')) :
     payment.amount;
 
   // Prioritize actual invoice line items if available, otherwise use payment allocations
@@ -1254,7 +1283,7 @@ export const generateCustomerStatementPDF = async (customer: any, invoices: any[
   const finalBalance = statementItems.length > 0 ? statementItems[statementItems.length - 1].line_total : 0;
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 2 }).format(amount);
+    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: resolveCurrency(company?.currency), minimumFractionDigits: 2 }).format(amount);
   };
 
   const documentData: DocumentData = {

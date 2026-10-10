@@ -1,5 +1,6 @@
 import type { CreditNote } from '@/hooks/useCreditNotes';
 import { lightenColor, getColorAsHslVar } from './colorUtils';
+import { resolveCurrency, resolvePdfBackground } from './activeCompanyConfig';
 
 export interface CreditNotePDFData extends CreditNote {
   customers: {
@@ -38,7 +39,10 @@ export interface CompanyData {
   country?: string;
   logo_url?: string;
   primary_color?: string;
+  tax_number?: string;
   currency?: string;
+  pdf_background_image?: string | null;
+  pdf_background_opacity?: number | string | null;
 }
 
 // Default company details (fallback) - logo will be determined dynamically
@@ -53,11 +57,35 @@ export const generateCreditNotePDF = (creditNote: CreditNotePDFData, company?: C
 
   const primaryColor = companyData.primary_color || '#6B7280';
   const primaryColorLight = lightenColor(primaryColor, 25);
-  
+
+  // Full-page background image (admin setting in Company Settings > Branding)
+  const background = resolvePdfBackground(companyData);
+  const backgroundCSS = background.url ? `
+        .page {
+          isolation: isolate;
+        }
+        .pdf-bg-layer {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image: url("${background.url.replace(/"/g, '\\"')}");
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          opacity: ${background.opacity};
+          z-index: -1;
+          pointer-events: none;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }` : '';
+  const backgroundHTML = background.url ? '<div class="pdf-bg-layer"></div>' : '';
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
-      currency: companyData.currency || 'USD',
+      currency: resolveCurrency(companyData.currency),
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount);
@@ -83,6 +111,7 @@ export const generateCreditNotePDF = (creditNote: CreditNotePDFData, company?: C
       <title>Credit Note ${creditNote.credit_note_number}</title>
       <meta charset="UTF-8">
       <style>
+        ${backgroundCSS}
         @page {
           size: A4;
           margin: 15mm;
@@ -430,6 +459,7 @@ export const generateCreditNotePDF = (creditNote: CreditNotePDFData, company?: C
     </head>
     <body>
       <div class="page">
+        ${backgroundHTML}
         <div class="watermark">Credit Note</div>
         
         <!-- Header Section -->

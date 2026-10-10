@@ -207,8 +207,10 @@ export function hasPermission(
     return true;
   }
 
-  // Admins bypass permission checks
-  if (auth.role?.toLowerCase() === 'admin') {
+  // Admins bypass permission checks (super_admin is admin-level everywhere else:
+  // see isAdmin() in server/db/mysql/authorization.ts and api.php)
+  const role = auth.role?.toLowerCase();
+  if (role === 'admin' || role === 'super_admin') {
     return true;
   }
 
@@ -261,37 +263,39 @@ export function userBelongsToCompany(auth: AuthContext, companyId: string): bool
  * Create a permission checker function for use with API adapters
  */
 export function createPermissionChecker(auth: AuthContext) {
+  // NOTE: these helpers call hasPermission() directly instead of `this.can()` —
+  // the methods are object-literal arrow functions, so `this` is undefined.
+  const can = (permission: Permission): boolean => hasPermission(auth, permission);
+  const canAny = (permissions: Permission[]): boolean => hasPermission(auth, permissions);
+  const canAll = (permissions: Permission[]): boolean => {
+    const role = auth.role?.toLowerCase();
+    if (role === 'admin' || role === 'super_admin') return true;
+    const rolePermissions = auth.roleDefinition?.permissions ||
+                          auth.permissions ||
+                          DEFAULT_ROLE_PERMISSIONS[role as keyof typeof DEFAULT_ROLE_PERMISSIONS] ||
+                          [];
+    return permissions.every(p => rolePermissions.includes(p));
+  };
+
   return {
-    can: (permission: Permission): boolean => {
-      return hasPermission(auth, permission);
-    },
-
-    canAny: (permissions: Permission[]): boolean => {
-      return hasPermission(auth, permissions);
-    },
-
-    canAll: (permissions: Permission[]): boolean => {
-      const rolePermissions = auth.roleDefinition?.permissions || 
-                            auth.permissions || 
-                            DEFAULT_ROLE_PERMISSIONS[auth.role?.toLowerCase() as any] || 
-                            [];
-      return permissions.every(p => rolePermissions.includes(p));
-    },
+    can,
+    canAny,
+    canAll,
 
     requirePermission: (permission: Permission): void => {
-      if (!this.can(permission)) {
+      if (!can(permission)) {
         throw new Error(`Insufficient permissions: requires ${permission}`);
       }
     },
 
     requireAny: (permissions: Permission[]): void => {
-      if (!this.canAny(permissions)) {
+      if (!canAny(permissions)) {
         throw new Error(`Insufficient permissions: requires any of ${permissions.join(', ')}`);
       }
     },
 
     requireAll: (permissions: Permission[]): void => {
-      if (!this.canAll(permissions)) {
+      if (!canAll(permissions)) {
         throw new Error(`Insufficient permissions: requires all of ${permissions.join(', ')}`);
       }
     },

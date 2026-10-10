@@ -10,6 +10,8 @@ services:
         value: "20"
       - key: VITE_EXTERNAL_API_URL
         value: https://diagsolutionsltd.com/api.php
+      - key: VITE_NATIVE_SCHEMA
+        value: "true"
     autoDeploy: false
     routes:
       - path: /

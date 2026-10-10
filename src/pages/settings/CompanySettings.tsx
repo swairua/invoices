@@ -49,10 +49,17 @@ import {
   type CompanyDataValidation,
 } from '@/utils/companySettingsValidators';
 
+// Normalise the PDF background opacity setting to a 0-100 string
+const toOpacityString = (value: unknown, fallback: string = '100'): string => {
+  if (value === null || value === undefined || String(value).trim() === '') return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return String(Math.min(100, Math.max(0, Math.round(parsed))));
+};
+
 export default function CompanySettings() {
   const { profile: currentUser } = useAuth();
   const { role, loading } = usePermissions();
-
   const [editingTax, setEditingTax] = useState<string | null>(null);
   const [newTax, setNewTax] = useState({ name: '', rate: 0, is_default: false });
   const [showNewTaxForm, setShowNewTaxForm] = useState(false);
@@ -67,6 +74,8 @@ export default function CompanySettings() {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewTemplateIndex, setPreviewTemplateIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const bgFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingBg, setUploadingBg] = useState(false);
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [companyData, setCompanyData] = useState({
     name: '',
@@ -87,7 +96,9 @@ export default function CompanySettings() {
     pdf_template: 'default',
     pdf_footer_line1: '',
     pdf_footer_line2: '',
-    pdf_footer_enabled_docs: [] as string[]
+    pdf_footer_enabled_docs: [] as string[],
+    pdf_background_image: '',
+    pdf_background_opacity: '100'
   });
 
   const { currentCompany, isLoading: companiesLoading, error: companiesError } = useCurrentCompany();
@@ -161,6 +172,8 @@ export default function CompanySettings() {
       pdf_footer_line1: currentCompany?.pdf_footer_line1 || prev.pdf_footer_line1,
       pdf_footer_line2: currentCompany?.pdf_footer_line2 || prev.pdf_footer_line2,
       pdf_footer_enabled_docs: currentCompany?.pdf_footer_enabled_docs ?? prev.pdf_footer_enabled_docs,
+      pdf_background_image: companyConfig.pdf_background_image ?? currentCompany?.pdf_background_image ?? prev.pdf_background_image,
+      pdf_background_opacity: toOpacityString(companyConfig.pdf_background_opacity ?? currentCompany?.pdf_background_opacity ?? prev.pdf_background_opacity),
     }));
   }, [currentCompany?.id, companyConfig]);
 
@@ -171,6 +184,60 @@ export default function CompanySettings() {
 
   const handleChooseFile = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleChooseBgFile = () => {
+    bgFileInputRef.current?.click();
+  };
+
+  const handleBgFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (bgFileInputRef.current) bgFileInputRef.current.value = '';
+    if (!file) return;
+
+    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validImageTypes.includes(file.type)) {
+      toast.error('Please select a valid image file (PNG, JPG, or WebP)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setUploadingBg(true);
+    try {
+      const result = await uploadImage(file);
+      if (!result.success || !result.url) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      const bgUrl = sanitizeLogoUrl(result.url);
+      setCompanyData(prev => ({ ...prev, pdf_background_image: bgUrl }));
+
+      if (currentCompany) {
+        await updateCompany.mutateAsync({ id: currentCompany.id, data: { pdf_background_image: bgUrl } });
+      }
+      toast.success('PDF background image uploaded. It will appear behind the content of exported PDFs.');
+    } catch (err) {
+      logError(err, 'PDF Background Upload');
+      toast.error(getUserFriendlyMessage(err, 'Failed to upload background image'));
+    } finally {
+      setUploadingBg(false);
+    }
+  };
+
+  const handleRemoveBg = async () => {
+    setCompanyData(prev => ({ ...prev, pdf_background_image: '' }));
+    try {
+      if (currentCompany) {
+        await updateCompany.mutateAsync({ id: currentCompany.id, data: { pdf_background_image: '' } });
+      }
+      toast.success('PDF background image removed.');
+    } catch (err) {
+      logError(err, 'PDF Background Remove');
+      toast.error(getUserFriendlyMessage(err, 'Failed to remove background image'));
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -373,7 +440,10 @@ export default function CompanySettings() {
         pdf_template: companyData.pdf_template?.trim() || 'default',
         pdf_footer_line1: companyData.pdf_footer_line1?.trim() || null,
         pdf_footer_line2: companyData.pdf_footer_line2?.trim() || null,
-        pdf_footer_enabled_docs: JSON.stringify(companyData.pdf_footer_enabled_docs || [])
+        pdf_footer_enabled_docs: JSON.stringify(companyData.pdf_footer_enabled_docs || []),
+        // Empty string is meaningful here: it clears the background image
+        pdf_background_image: companyData.pdf_background_image?.trim() || '',
+        pdf_background_opacity: toOpacityString(companyData.pdf_background_opacity)
       };
 
       // Include optional fields that exist in the schema
@@ -391,7 +461,7 @@ export default function CompanySettings() {
 
       // Remove empty strings and convert to null for optional fields
       Object.keys(sanitizedData).forEach(key => {
-        if (key !== 'name' && key !== 'country' && key !== 'pdf_footer_enabled_docs') {
+        if (key !== 'name' && key !== 'country' && key !== 'pdf_footer_enabled_docs' && key !== 'pdf_background_image') {
           if (sanitizedData[key] === '' || sanitizedData[key] === undefined) {
             sanitizedData[key] = null;
           }
@@ -1186,6 +1256,73 @@ export default function CompanySettings() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* PDF Background / Watermark Image */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle>PDF Background Image</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Background image</Label>
+                <div
+                  className="relative w-full h-44 rounded-lg border border-border overflow-hidden bg-muted flex items-center justify-center"
+                  style={companyData.pdf_background_image ? {
+                    backgroundImage: `url("${companyData.pdf_background_image}")`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    opacity: Number(toOpacityString(companyData.pdf_background_opacity)) / 100
+                  } : undefined}
+                >
+                  {!companyData.pdf_background_image && (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <Image className="h-8 w-8" />
+                      <span className="text-xs">No background image set</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={handleChooseBgFile} disabled={uploadingBg}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    {uploadingBg ? 'Uploading...' : companyData.pdf_background_image ? 'Replace' : 'Upload'}
+                  </Button>
+                  {companyData.pdf_background_image && (
+                    <Button type="button" variant="outline" size="sm" onClick={handleRemoveBg}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remove
+                    </Button>
+                  )}
+                  <input
+                    ref={bgFileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={handleBgFileChange}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The image covers the whole PDF page behind the content, like a watermark. Use a light or
+                  semi-transparent image so text stays readable. The image is saved immediately; click Save Settings after changing opacity.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pdf-bg-opacity">Opacity (0-100)</Label>
+                <Input
+                  id="pdf-bg-opacity"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={companyData.pdf_background_opacity}
+                  onChange={(e) => setCompanyData(prev => ({ ...prev, pdf_background_opacity: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Lower values make the image fainter behind the document content.
+                </p>
               </div>
             </CardContent>
           </Card>

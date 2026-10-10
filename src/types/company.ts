@@ -20,6 +20,8 @@ export interface CompanyRecord {
   pdf_footer_line1?: string | null;
   pdf_footer_line2?: string | null;
   pdf_footer_enabled_docs?: string[] | string | null;
+  pdf_background_image?: string | null;
+  pdf_background_opacity?: number | string | null;
   facebook_url?: string | null;
   instagram_url?: string | null;
   linkedin_url?: string | null;

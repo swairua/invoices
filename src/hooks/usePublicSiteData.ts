@@ -1,16 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { externalApiAdapter } from '@/integrations/database/external-api-adapter';
+import { getClientApiUrl } from '@/utils/getApiUrl';
 
 /**
  * Public website data hooks.
  * All reads go through the public (unauthenticated) endpoint and are strictly
  * read-only - they never touch write paths or mutate the real data.
+ *
+ * Native schema: products / product_categories / invoices / invoice_items
+ * via the `public_read` action, aggregate stats via `public_stats`.
  */
-
-const NUM = (result: any): number => {
-  const total = result?.data?.[0]?.total;
-  return Number(total) || 0;
-};
 
 export interface PublicStats {
   clients: number;
@@ -23,18 +22,24 @@ export function usePublicStats() {
   return useQuery<PublicStats>({
     queryKey: ['public-stats'],
     queryFn: async () => {
-      const [clients, invoices, products, billed] = await Promise.all([
-        externalApiAdapter.select('clients', { _count_only: true }, true),
-        externalApiAdapter.select('invoices', { is_deleted: 0, invoice_type_id: 1, _count_only: true }, true),
-        externalApiAdapter.select('products', { is_deleted: 0, _count_only: true }, true),
-        externalApiAdapter.select('invoices', { is_deleted: 0, invoice_type_id: 1, _sum: 'amount' }, true),
-      ]);
-      return {
-        clients: NUM(clients),
-        invoices: NUM(invoices),
-        products: NUM(products),
-        totalBilled: Math.round(NUM(billed) * 100) / 100,
-      };
+      try {
+        const res = await fetch(`${getClientApiUrl()}?action=public_stats`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) throw new Error(`public_stats failed: ${res.status}`);
+        const json = await res.json();
+        if (json.status !== 'success' || !json.data) throw new Error(json.message || 'public_stats failed');
+        const d = json.data;
+        return {
+          clients: Number(d.customers) || 0,
+          invoices: Number(d.invoices) || 0,
+          products: Number(d.products) || 0,
+          totalBilled: Math.round((Number(d.total_billed) || 0) * 100) / 100,
+        };
+      } catch {
+        return { clients: 0, invoices: 0, products: 0, totalBilled: 0 };
+      }
     },
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -48,7 +53,7 @@ export function usePublicProducts(limit = 48) {
       const { data, error } = await externalApiAdapter.select(
         'products',
         {
-          is_deleted: 0,
+          status: 'active',
           _limit: limit,
           _order: { column: 'created_at', direction: 'desc' },
         },
@@ -78,7 +83,6 @@ export function usePublicRecentInvoiced(count = 12) {
       const invResult = await externalApiAdapter.select(
         'invoices',
         {
-          is_deleted: 0,
           _order: { column: 'invoice_date', direction: 'desc' },
           _limit: 10,
         },

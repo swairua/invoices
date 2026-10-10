@@ -123,7 +123,7 @@ export default function PublicProducts() {
               variant="outline"
               className="border-slate-300 bg-white"
             >
-              <Link to="/">
+              <Link to="/home">
                 <span className="font-semibold">Back to website</span>
               </Link>
             </Button>

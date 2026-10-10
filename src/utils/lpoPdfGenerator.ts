@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { getColorAsRgbArray } from './colorUtils';
+import { resolveCurrency } from './activeCompanyConfig';
 
 export interface LPOPDFData {
   id: string;
@@ -52,6 +53,7 @@ export interface CompanyData {
   registration_number?: string;
   tax_number?: string;
   logo_url?: string;
+  currency?: string;
 }
 
 export const generateLPOPDF = async (lpo: LPOPDFData, company: CompanyData) => {
@@ -228,10 +230,10 @@ export const generateLPOPDF = async (lpo: LPOPDFData, company: CompanyData) => {
       item.products?.name || 'N/A',
       item.description,
       `${item.quantity} ${item.products?.unit_of_measure || 'pcs'}`,
-      formatCurrency(item.unit_price),
+      formatCurrency(item.unit_price, company.currency),
       `${item.tax_rate}%`,
-      formatCurrency(item.tax_amount),
-      formatCurrency(item.line_total)
+      formatCurrency(item.tax_amount, company.currency),
+      formatCurrency(item.line_total, company.currency)
     ]);
 
     autoTable(doc, {
@@ -265,17 +267,17 @@ export const generateLPOPDF = async (lpo: LPOPDFData, company: CompanyData) => {
     doc.setFontSize(10);
 
     doc.text('Subtotal:', totalsX - 30, yPosition);
-    doc.text(formatCurrency(lpo.subtotal), totalsX, yPosition);
+    doc.text(formatCurrency(lpo.subtotal, company.currency), totalsX, yPosition);
     yPosition += 8;
 
     doc.text('Tax Amount:', totalsX - 30, yPosition);
-    doc.text(formatCurrency(lpo.tax_amount), totalsX, yPosition);
+    doc.text(formatCurrency(lpo.tax_amount, company.currency), totalsX, yPosition);
     yPosition += 8;
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.text('Total Amount:', totalsX - 30, yPosition);
-    doc.text(formatCurrency(lpo.total_amount), totalsX, yPosition);
+    doc.text(formatCurrency(lpo.total_amount, company.currency), totalsX, yPosition);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     yPosition += 15;
@@ -328,10 +330,10 @@ const formatDate = (dateString: string) => {
   });
 };
 
-const formatCurrency = (amount: number) => {
+const formatCurrency = (amount: number, currency?: string) => {
   return new Intl.NumberFormat('en-KE', {
     style: 'currency',
-    currency: 'KES',
+    currency: resolveCurrency(currency),
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(amount);

@@ -22,6 +22,7 @@ import {
 import { downloadRemittancePDF } from '@/utils/pdfGenerator';
 import { toast } from 'sonner';
 import { useCurrentCompany } from '@/contexts/CompanyContext';
+import { resolveCurrency } from '@/utils/activeCompanyConfig';
 
 interface ViewRemittanceModalProps {
   open: boolean;
@@ -41,9 +42,9 @@ export function ViewRemittanceModal({
   if (!remittance) return null;
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-KE', {
       style: 'currency',
-      currency: 'USD',
+      currency: resolveCurrency(currentCompany?.currency),
       minimumFractionDigits: 2,
     }).format(amount || 0);
   };
@@ -80,7 +81,8 @@ export function ViewRemittanceModal({
         tax_number: currentCompany.tax_number,
         logo_url: currentCompany.logo_url,
         primary_color: currentCompany.primary_color,
-        pdf_template: currentCompany.pdf_template
+        pdf_template: currentCompany.pdf_template,
+        currency: currentCompany.currency
       } : undefined;
 
       // Use the same download function from the parent component

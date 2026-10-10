@@ -3,6 +3,7 @@ import { getDatabase } from '@/integrations/database';
 import { getClientApiUrl } from '@/utils/getApiUrl';
 import { logError } from '@/utils/errorLogger';
 import { updateFavicon } from '@/utils/seoHelpers';
+import { setActiveCompanyConfig } from '@/utils/activeCompanyConfig';
 import type { CompanyRecord } from '@/types/company';
 
 /**
@@ -89,6 +90,8 @@ export function CompanyConfigProvider({ children }: { children: ReactNode }) {
               primary_color: cd.primary_color,
               currency: cd.currency,
               description: cd.description,
+              pdf_background_image: cd.pdf_background_image,
+              pdf_background_opacity: cd.pdf_background_opacity,
             };
           }
         }
@@ -114,10 +117,17 @@ export function CompanyConfigProvider({ children }: { children: ReactNode }) {
         logo_url: source.logo_url || defaultConfig.logo_url,
         primary_color: source.primary_color || defaultConfig.primary_color,
         description: source.description || defaultConfig.description,
+        pdf_background_image: source.pdf_background_image || null,
+        pdf_background_opacity: source.pdf_background_opacity ?? null,
       };
 
       console.log('✅ Company config loaded:', loadedConfig.name, '- logo:', loadedConfig.logo_url);
       setConfig(loadedConfig);
+      setActiveCompanyConfig({
+        currency: loadedConfig.currency,
+        pdf_background_image: loadedConfig.pdf_background_image,
+        pdf_background_opacity: loadedConfig.pdf_background_opacity,
+      });
       updateFavicon(loadedConfig.logo_url, loadedConfig);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));

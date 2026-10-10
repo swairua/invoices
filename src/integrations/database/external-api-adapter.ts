@@ -15,7 +15,7 @@ import type {
 import { getAPIBaseURL } from '../../utils/environment-detection';
 import { handleAuthFailure } from '../../utils/authFailureHandler';
 import { logTokenDiagnostics } from '../../utils/tokenDiagnostics';
-import { mapReadTable, mapReadFilter, mapRow, mapWriteTable, mapWriteData } from './schema-map';
+import { mapReadTable, mapReadFilter, mapRow, mapWriteTable, mapWriteData, setNativeSchemaMode } from './schema-map';
 
 export class ExternalAPIAdapter implements IDatabase {
   private apiBase: string;
@@ -40,6 +40,10 @@ export class ExternalAPIAdapter implements IDatabase {
       this.apiBase = this.externalApiUrl;
 
       console.log('📡 API endpoint configured:', this.apiBase);
+
+      // The live backend (diagsolutionsltd.com / fweafrmr_med) speaks the
+      // app's domain names directly; local Invoice Ninja dev needs mapping.
+      setNativeSchemaMode(this.apiBase.includes('diagsolutionsltd.com'));
 
       // NOTE: We no longer cache the token on construction.
       // This prevents timing/initialization issues where the adapter

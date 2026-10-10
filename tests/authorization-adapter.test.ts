@@ -488,7 +488,8 @@ describe('Authorization Adapter', () => {
         // Missing role and companyId
       };
 
-      const isValid = incompleteAuth.userId && incompleteAuth.email;
+      // Both required fields are present (&& yields the last truthy value)
+      const isValid = Boolean(incompleteAuth.userId && incompleteAuth.email);
       expect(isValid).toBe(true);
       // But would fail full validation
     });

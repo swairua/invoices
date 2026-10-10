@@ -6,7 +6,34 @@
  * Read-only: real data tables map to their raw equivalents. The mapping never
  * rewrites table names on write paths, so app writes stay on the added tables
  * and can never modify the existing real data.
+ *
+ * NATIVE-SCHEMA MODE: the live backend (fweafrmr_med) speaks the app's domain
+ * names directly (companies, customers, quotations, ...), so every mapping
+ * below is bypassed and rows pass through with only null-safe aliasing.
+ * Local dev against the Invoice Ninja import (hycmvsgn_heal) keeps the
+ * mappings. Enabled via VITE_NATIVE_SCHEMA=true, or automatically when the
+ * API URL points at diagsolutionsltd.com (set by ExternalAPIAdapter).
  */
+
+// ---------------------------------------------------------------------------
+// Native-schema mode flag (live backend speaks domain names directly)
+// ---------------------------------------------------------------------------
+let nativeSchemaMode = false;
+
+export function setNativeSchemaMode(enabled: boolean): void {
+  nativeSchemaMode = enabled;
+}
+
+export function isNativeSchema(): boolean {
+  if (nativeSchemaMode) return true;
+  try {
+    const flag = import.meta.env?.VITE_NATIVE_SCHEMA;
+    if (typeof flag === 'string') return flag.toLowerCase() === 'true';
+  } catch {
+    // import.meta unavailable (tests/SSR) - fall back to the explicit flag
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // Table name mapping (READ only)
@@ -21,6 +48,7 @@ const READ_TABLE_MAP: Record<string, string> = {
 };
 
 export function mapReadTable(table: string): string {
+  if (isNativeSchema()) return table;
   return READ_TABLE_MAP[table] || table;
 }
 
@@ -40,6 +68,7 @@ const FILTER_KEY_MAP: Record<string, Record<string, string>> = {
 };
 
 export function mapReadFilter(table: string, filter?: Record<string, any>): Record<string, any> | undefined {
+  if (isNativeSchema()) return filter;
   if (!filter || typeof filter !== 'object') {
     // Even with empty filter, quotations need invoice_type_id=2
     if (table === 'quotations') {
@@ -291,6 +320,7 @@ export function mapWriteTable(table: string): string {
  */
 export function mapWriteData(table: string, data?: Record<string, any>): Record<string, any> | undefined {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  if (isNativeSchema()) return data;
 
   const columnMap = WRITE_COLUMN_MAP[table];
   const valueTransforms = WRITE_VALUE_TRANSFORMS[table];
@@ -318,6 +348,18 @@ export function mapRow(table: string, row: any): any {
   const mapped: any = { ...row };
 
   switch (rawTable) {
+    case 'customers':
+      // Native-schema table (live backend). Real columns pass through;
+      // only add the customer_code alias the app code expects.
+      mapped.phone = row.phone ?? '';
+      mapped.email = row.email ?? '';
+      mapped.address = row.address ?? '';
+      mapped.customer_code = row.customer_code ?? row.customer_number ?? '';
+      if (mapped.is_active === undefined || mapped.is_active === null) {
+        mapped.is_active = row.is_deleted == null || Number(row.is_deleted) === 0;
+      }
+      break;
+
     case 'clients':
       mapped.phone = row.work_phone ?? row.phone ?? '';
       mapped.company_id = row.account_id != null ? String(row.account_id) : row.company_id;
@@ -327,7 +369,7 @@ export function mapRow(table: string, row: any): any {
       mapped.is_active = row.is_deleted == null || Number(row.is_deleted) === 0;
       break;
 
-    case 'accounts':
+    case 'accounts': {
       mapped.email = row.work_email ?? row.email ?? '';
       mapped.phone = row.work_phone ?? row.phone ?? '';
       mapped.tax_number = row.vat_number ?? row.tax_number ?? '';
@@ -342,6 +384,7 @@ export function mapRow(table: string, row: any): any {
       const accountsLogo = row.logo ?? row.logo_url ?? '';
       mapped.logo_url = accountsLogo && /^(https?:|data:|blob:|\/)/.test(accountsLogo) ? accountsLogo : '';
       break;
+    }
 
     case 'users':
       mapped.full_name = `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim() || row.username || row.email || 'User';
@@ -358,11 +401,12 @@ export function mapRow(table: string, row: any): any {
     case 'invoices':
       mapped.customer_id = row.client_id != null ? String(row.client_id) : row.customer_id;
       mapped.company_id = row.account_id != null ? String(row.account_id) : row.company_id;
-      mapped.total_amount = row.amount ?? row.total_amount ?? 0;
-      mapped.total = row.amount ?? row.total ?? 0;
-      mapped.balance_due = row.balance ?? row.balance_due ?? 0;
-      mapped.paid_amount = (Number(row.amount) || 0) - (Number(row.balance) || 0);
-      mapped.subtotal = Number(row.amount) || 0;
+      // Prefer native columns when present; fall back to Invoice Ninja ones
+      mapped.total_amount = row.total_amount ?? row.amount ?? 0;
+      mapped.total = row.total ?? row.amount ?? 0;
+      mapped.balance_due = row.balance_due ?? row.balance ?? 0;
+      mapped.paid_amount = row.paid_amount ?? ((Number(row.amount) || 0) - (Number(row.balance) || 0));
+      mapped.subtotal = row.subtotal ?? (Number(row.amount) || 0);
       mapped.status = INVOICE_STATUS_MAP[String(row.invoice_status_id)] ?? row.status ?? 'sent';
       // Quotations are stored as invoices with invoice_type_id=2, but use different field names
       if (table === 'quotations') {
@@ -380,7 +424,7 @@ export function mapRow(table: string, row: any): any {
       mapped.description = row.notes ?? row.description ?? row.product_key ?? '';
       mapped.quantity = row.qty ?? row.quantity ?? 0;
       mapped.unit_price = row.cost ?? row.unit_price ?? 0;
-      mapped.line_total = (Number(row.cost) || 0) * (Number(row.qty) || 0);
+      mapped.line_total = row.line_total ?? ((Number(row.cost) || 0) * (Number(row.qty) || 0));
       break;
 
     case 'products':
@@ -391,8 +435,9 @@ export function mapRow(table: string, row: any): any {
       mapped.cost_price = row.cost ?? row.cost_price ?? 0;
       mapped.stock_quantity = row.qty ?? row.stock_quantity ?? 0;
       mapped.quantity = row.qty ?? row.quantity ?? 0;
-      mapped.unit_price = row.price ?? 0;
-      mapped.selling_price = row.price ?? 0;
+      // Native schema has unit_price as the selling price (no separate column)
+      mapped.unit_price = row.unit_price ?? row.price ?? 0;
+      mapped.selling_price = row.selling_price ?? row.unit_price ?? row.price ?? 0;
       mapped.reorder_level = row.reorder_level ?? 0;
       mapped.company_id = row.account_id ?? row.company_id;
       break;

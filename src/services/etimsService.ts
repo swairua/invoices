@@ -5,9 +5,9 @@
  * Frontend NEVER talks directly to KRA API - only through backend
  */
 
-// Use import.meta.env for Vite, with fallback to current origin
-const API_BASE_URL = import.meta.env.VITE_API_URL ||
-                     (typeof window !== 'undefined' ? window.location.origin : '');
+// All backend calls go through the centralized api.php URL resolver so they
+// work both in dev (vite proxy) and in production at the domain root.
+import { getClientApiUrl } from '@/utils/getApiUrl';
 
 export interface EtimsSubmitRequest {
   invoiceId: number;
@@ -88,7 +88,7 @@ export interface EtimsSubmissionsListResponse {
  * Get auth token from localStorage
  */
 function getAuthToken(): string {
-  return localStorage.getItem('auth_token') || '';
+  return localStorage.getItem('med_api_token') || '';
 }
 
 /**
@@ -98,7 +98,7 @@ function getAuthToken(): string {
  */
 export async function submitSaleToETIMS(payload: EtimsSubmitRequest): Promise<EtimsSubmitResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api?action=etims_submit_sale`, {
+    const response = await fetch(`${getClientApiUrl()}?action=etims_submit_sale`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -135,7 +135,7 @@ export async function submitSaleToETIMS(payload: EtimsSubmitRequest): Promise<Et
  */
 export async function retryETIMSSubmissions(options?: EtimsRetryRequest): Promise<EtimsRetryResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api?action=etims_retry_submissions`, {
+    const response = await fetch(`${getClientApiUrl()}?action=etims_retry_submissions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -163,7 +163,7 @@ export async function retryETIMSSubmissions(options?: EtimsRetryRequest): Promis
  */
 export async function checkETIMSStatus(): Promise<EtimsStatusResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api?action=etims_status`, {
+    const response = await fetch(`${getClientApiUrl()}?action=etims_status`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -203,7 +203,7 @@ export async function listETIMSSubmissions(
     if (filters?.limit) params.append('limit', filters.limit.toString());
     if (filters?.offset) params.append('offset', filters.offset.toString());
 
-    const response = await fetch(`${API_BASE_URL}/api?${params.toString()}`, {
+    const response = await fetch(`${getClientApiUrl()}?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
