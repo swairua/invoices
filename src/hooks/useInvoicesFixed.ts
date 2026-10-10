@@ -18,12 +18,12 @@ export const useInvoicesFixed = (companyId?: string) => {
       try {
         console.log('[useInvoicesFixed] Starting fetch for companyId:', companyId);
 
-        // Fetch invoices using the external API adapter
-        // invoice_type_id=1 for actual invoices (excludes quotations where type_id=2)
+        // Fetch invoices using the external API adapter.
+        // NOTE: the invoices table has no invoice_type_id column, so it must
+        // not be sent as a SQL filter. Quotations live in a separate table.
         console.log('[useInvoicesFixed] Calling apiClient.select("invoices", {company_id:', companyId, '})');
         const { data: invoices, error: invoicesError } = await apiClient.select('invoices', {
-          company_id: companyId,
-          invoice_type_id: 1
+          company_id: companyId
         });
 
         console.log('[useInvoicesFixed] API response - Error:', invoicesError);
@@ -149,10 +149,10 @@ export const useCustomerInvoicesFixed = (customerId?: string, companyId?: string
       try {
         console.log('Fetching invoices for customer:', customerId);
 
-        // Fetch invoices for the customer using the external API adapter
+        // Fetch invoices for the customer using the external API adapter.
+        // NOTE: the invoices table has no invoice_type_id column.
         const { data: invoices, error: invoicesError } = await apiClient.select('invoices', {
           customer_id: customerId,
-          invoice_type_id: 1,
           ...(companyId && { company_id: companyId })
         });
 

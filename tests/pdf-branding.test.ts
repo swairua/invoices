@@ -359,6 +359,57 @@ describe('generateCreditNotePDF (background image + dynamic currency)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 5. Invoice fetch filters only use real invoices-table columns
+// ---------------------------------------------------------------------------
+// Regression guard for: "Unknown column 'invoice_type_id' in 'where clause'.
+// Neither live `invoices` schema has invoice_type_id (quotations live in a
+// separate table), so apiClient.select('invoices', ...) must never send it as
+// a SQL filter. Verified at source level so the backend query succeeds.
+
+describe('invoice fetch filters (regression)', () => {
+  it('never filters the invoices table by invoice_type_id', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const hookPath = path.resolve(__dirname, '..', 'src', 'hooks', 'useInvoicesFixed.ts');
+    const source = fs.readFileSync(hookPath, 'utf8');
+
+    // No select() call on the invoices table may carry an invoice_type_id key
+    const selects = [...source.matchAll(/apiClient\.select\(\s*'invoices'\s*,\s*\{([\s\S]*?)\}\s*\)/g)];
+    expect(selects.length).toBeGreaterThan(0);
+    for (const match of selects) {
+      expect(match[1]).not.toMatch(/invoice_type_id/);
+    }
+  });
+
+  it('filters invoices only by columns present in the live schema', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    // fweafrmr_med schema is authoritative for the app-managed invoices table
+    const schemaPath = path.resolve(__dirname, '..', 'fweafrmr_med.sql');
+    const schema = fs.readFileSync(schemaPath, 'utf8');
+    const createTable = schema.match(/CREATE TABLE `invoices` \(([\s\S]*?)\) ENGINE/m);
+    expect(createTable).not.toBeNull();
+    const columns = [...createTable![1].matchAll(/`([a-z_]+)`/g)].map(m => m[1]);
+
+    expect(columns).toContain('company_id');
+    expect(columns).toContain('customer_id');
+    expect(columns).not.toContain('invoice_type_id');
+
+    const hookPath = path.resolve(__dirname, '..', 'src', 'hooks', 'useInvoicesFixed.ts');
+    const source = fs.readFileSync(hookPath, 'utf8');
+    const selects = [...source.matchAll(/apiClient\.select\(\s*'invoices'\s*,\s*\{([\s\S]*?)\}\s*\)/g)];
+    for (const match of selects) {
+      const keys = [...match[1].matchAll(/(?:^|[\s,{])([a-z_]+)\s*:/gm)].map(m => m[1]);
+      for (const key of keys) {
+        if (key.startsWith('_')) continue; // adapter control keys, not SQL
+        expect(columns).toContain(key);
+      }
+    }
+  });
+});
+
+
+// ---------------------------------------------------------------------------
 // 5. Full page-area coverage of the background layer
 // ---------------------------------------------------------------------------
 
